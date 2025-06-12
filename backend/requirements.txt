@@ -1,0 +1,28 @@
+# Core FastAPI and server dependencies
+fastapi==0.110.0
+uvicorn[standard]==0.27.0
+websockets==12.0
+python-multipart==0.0.6
+pydantic==2.6.1
+
+# LangChain and LangGraph (compatible versions)
+langchain==0.2.16
+langchain-core==0.2.38
+langchain-openai==0.1.25
+langgraph==0.2.14
+langsmith==0.1.129
+
+# Smart Analysis Tools Dependencies
+packaging==23.2
+dataclasses==0.6
+
+# GitHub Integration Dependencies
+PyGithub==1.59.1
+
+# Utilities
+python-dotenv==1.0.0
+GitPython==3.1.40
+httpx==0.25.2
+pytest==7.4.3
+pytest-asyncio==0.21.1
+requests==2.31.0
