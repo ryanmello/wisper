@@ -131,18 +131,16 @@ export default function RepositorySelector({ onRepoSelect }: RepositorySelectorP
   }, [handleTokenConnect]);
 
   const handleGitHubAuth = () => {
-    // Check if GitHub OAuth is properly configured
     if (!GITHUB_CLIENT_ID || GITHUB_CLIENT_ID.trim() === '') {
       setError("GitHub OAuth not configured. Please use the token option below.");
       setShowTokenInput(true);
       return;
     }
 
-    const REDIRECT_URI = "http://localhost:3000/auth/callback";
-    const SCOPES = "repo user";
+    const REDIRECT_URI = `${process.env.NEXT_PUBLIC_FRONTEND_URL}/auth/callback`;
+    const SCOPES = "repo user admin:repo_hook";
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}`;
     
-    console.log('Redirecting to GitHub OAuth:', githubAuthUrl);
     window.location.href = githubAuthUrl;
   };
 

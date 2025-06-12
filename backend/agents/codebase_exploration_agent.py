@@ -1,21 +1,15 @@
-"""
-Codebase Exploration Agent - Comprehensive codebase analysis and architectural insights
-"""
-
 import os
 import json
 import logging
 from typing import Dict, List, Any, TypedDict
 from pathlib import Path
 from collections import defaultdict, Counter
-
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 
 logger = logging.getLogger(__name__)
 
-# Analysis State for LangGraph
 class CodebaseAnalysisState(TypedDict):
     repository_url: str
     clone_path: str
@@ -31,17 +25,16 @@ class CodebaseAnalysisState(TypedDict):
     current_step: str
     errors: List[str]
 
-class CodebaseExplorationAgent:
-    """Agent specialized in comprehensive codebase exploration and architectural analysis."""
-    
+class CodebaseExplorationAgent:    
     def __init__(self, openai_api_key: str):
-        self.openai_api_key = openai_api_key
-        self.temp_dir = None
         self.llm = ChatOpenAI(
             model="gpt-4", 
             temperature=0,
             api_key=openai_api_key
         )
+        
+        self.openai_api_key = openai_api_key
+        self.temp_dir = None
         self.current_state = None
         
         self.config_files = {
@@ -64,12 +57,9 @@ class CodebaseExplorationAgent:
         }
 
     def analyze_file_structure(self, root_path: str) -> Dict[str, Any]:
-        """Analyze the file structure and organization."""
-        structure = {}
         file_types = Counter()
         directory_analysis = defaultdict(list)
         
-        # Skip common directories that don't need analysis
         skip_dirs = {
             '.git', '__pycache__', 'node_modules', '.next', 'dist', 'build',
             '.vscode', '.idea', 'coverage', '.pytest_cache', 'venv', 'env'
@@ -79,7 +69,6 @@ class CodebaseExplorationAgent:
         total_lines = 0
         
         for root, dirs, files in os.walk(root_path):
-            # Filter out skip directories
             dirs[:] = [d for d in dirs if d not in skip_dirs]
             
             rel_path = os.path.relpath(root, root_path)
@@ -97,7 +86,6 @@ class CodebaseExplorationAgent:
                 directory_analysis[rel_path].append(file)
                 total_files += 1
                 
-                # Count lines for code files
                 if file_ext in ['.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c', '.go', '.rs']:
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -119,7 +107,6 @@ class CodebaseExplorationAgent:
         languages = Counter()
         frameworks = []
         
-        # Language detection by file extension
         language_map = {
             '.py': 'Python', '.js': 'JavaScript', '.ts': 'TypeScript',
             '.jsx': 'React JSX', '.tsx': 'TypeScript React',
@@ -135,7 +122,6 @@ class CodebaseExplorationAgent:
                 if ext in language_map:
                     languages[language_map[ext]] += 1
         
-        # Framework detection
         for framework, indicators in self.framework_indicators.items():
             score = 0
             for indicator in indicators:
@@ -143,7 +129,7 @@ class CodebaseExplorationAgent:
                 if os.path.exists(indicator_path):
                     score += 1
             
-            if score >= len(indicators) * 0.5:  # At least 50% of indicators present
+            if score >= len(indicators) * 0.5:
                 frameworks.append({
                     "name": framework,
                     "confidence": score / len(indicators),
@@ -218,53 +204,38 @@ class CodebaseExplorationAgent:
         """Identify architectural patterns and design approaches."""
         patterns = []
         
-        # Check for common architectural patterns
         dirs = [d for d in os.listdir(root_path) if os.path.isdir(os.path.join(root_path, d))]
         files = [f for f in os.listdir(root_path) if os.path.isfile(os.path.join(root_path, f))]
         
-        # MVC Pattern
         if any(d in ['models', 'views', 'controllers'] for d in dirs) or \
            any(d in ['app/models', 'app/views', 'app/controllers'] for d in dirs):
             patterns.append("MVC (Model-View-Controller)")
         
-        # Microservices
         if 'docker-compose.yml' in files or 'kubernetes' in dirs or 'k8s' in dirs:
             patterns.append("Microservices Architecture")
         
-        # Clean Architecture
         if any(d in ['domain', 'infrastructure', 'application', 'interfaces'] for d in dirs):
             patterns.append("Clean Architecture")
         
-        # Component-based (React/Vue)
         if 'components' in dirs or 'src/components' in [os.path.join(r, d) for r, dirs, f in os.walk(root_path) for d in dirs]:
             patterns.append("Component-Based Architecture")
         
-        # Layered Architecture
         if any(d in ['services', 'repositories', 'entities', 'dto'] for d in dirs):
             patterns.append("Layered Architecture")
         
-        # Event-Driven
         if any(keyword in str(dirs + files).lower() for keyword in ['event', 'queue', 'pub', 'sub', 'kafka', 'rabbitmq']):
             patterns.append("Event-Driven Architecture")
         
-        # API-First
         if any(f in ['openapi.yml', 'swagger.yml', 'api.yml'] for f in files) or 'api' in dirs:
             patterns.append("API-First Design")
         
         return patterns
 
     def extract_main_components(self, root_path: str, language_info: Dict) -> List[Dict[str, Any]]:
-        """Extract and analyze main components/modules."""
         components = []
-        
-        # Look for main application files
         main_files = []
-        
-        # Common main file patterns
-        main_patterns = [
-            'main.py', 'app.py', 'server.py', 'index.js', 'app.js', 'server.js',
-            'main.go', 'main.java', 'Program.cs', 'main.cpp', 'main.rs'
-        ]
+        main_patterns = [ 'main.py', 'app.py', 'server.py', 'index.js', 'app.js', 'server.js',
+                          'main.go', 'main.java', 'Program.cs', 'main.cpp', 'main.rs']
         
         for pattern in main_patterns:
             file_path = os.path.join(root_path, pattern)
@@ -276,7 +247,6 @@ class CodebaseExplorationAgent:
                     "size": os.path.getsize(file_path)
                 })
         
-        # Look for configuration files
         config_files = []
         for config_file in self.config_files:
             file_path = os.path.join(root_path, config_file)
@@ -288,7 +258,6 @@ class CodebaseExplorationAgent:
                     "size": os.path.getsize(file_path)
                 })
         
-        # Look for important directories
         important_dirs = []
         dir_types = {
             'src': 'Source Code',
@@ -365,7 +334,6 @@ class CodebaseExplorationAgent:
         response = await self.llm.ainvoke(messages)
         return response.content
 
-    # LangGraph workflow functions
     async def clone_and_setup(self, state: CodebaseAnalysisState) -> CodebaseAnalysisState:
         """Step 1: Clone repository and basic setup."""
         state["current_step"] = "Initializing repository clone..."
@@ -383,7 +351,6 @@ class CodebaseExplorationAgent:
 
         state["clone_path"] = clone_result["clone_path"]
         
-        # Store temp_dir for cleanup compatibility
         if clone_result["status"] == "success":
             self.temp_dir = clone_result["clone_path"]
             
@@ -487,17 +454,14 @@ class CodebaseExplorationAgent:
         return state
 
     def create_workflow(self):
-        """Create the LangGraph workflow for repository analysis."""
         workflow = StateGraph(CodebaseAnalysisState)
         
-        # Add workflow steps
         workflow.add_node("clone", self.clone_and_setup)
         workflow.add_node("structure", self.analyze_structure)
         workflow.add_node("languages", self.analyze_languages)
         workflow.add_node("architecture", self.identify_architecture)
         workflow.add_node("insights", self.generate_insights)
         
-        # Define the workflow sequence
         workflow.set_entry_point("clone")
         workflow.add_edge("clone", "structure")
         workflow.add_edge("structure", "languages")
@@ -510,7 +474,6 @@ class CodebaseExplorationAgent:
     async def analyze_repository(self, repository_url: str):
         """Main method to analyze a repository with comprehensive codebase exploration."""
         
-        # Initial state
         initial_state = CodebaseAnalysisState(
             repository_url=repository_url,
             clone_path="",
@@ -527,19 +490,16 @@ class CodebaseExplorationAgent:
             errors=[]
         )
         
-        # Store reference for progress updates
         self.current_state = initial_state
         
-        # Create and run workflow
         workflow = self.create_workflow()
         
         final_state = None
         async for step_output in workflow.astream(initial_state):
-            # LangGraph returns a dict with node names as keys
             for node_name, state in step_output.items():
                 final_state = state
                 self.current_state = state
-                # Emit progress updates for real-time UI updates
+
                 yield {
                     "type": "progress",
                     "current_step": state["current_step"],
@@ -552,7 +512,6 @@ class CodebaseExplorationAgent:
                     }
                 }
         
-        # Cleanup
         if hasattr(self, 'temp_dir') and self.temp_dir and os.path.exists(self.temp_dir):
             from services.repository_service import repository_service
             cleanup_success = repository_service.cleanup_directory(self.temp_dir)
@@ -560,7 +519,6 @@ class CodebaseExplorationAgent:
                 repository_service.schedule_delayed_cleanup(self.temp_dir)
             self.temp_dir = None
         
-        # Return final results
         yield {
             "type": "completed",
             "results": {

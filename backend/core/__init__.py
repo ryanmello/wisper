@@ -1,1 +1,0 @@
-"""Core application logic and initialization.""" 

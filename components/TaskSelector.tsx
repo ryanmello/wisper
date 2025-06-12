@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { WhisperAPI, generateContextSuggestions, ToolRegistryInfo, TaskType } from "@/lib/api";
-import { Zap, Brain, Clock, Target, Settings2, Lightbulb } from "lucide-react";
+import { Zap, Brain, Clock, Target, Settings2, Lightbulb, AlertCircle } from "lucide-react";
 
 interface TaskSelectorProps {
   repository: string;
@@ -37,15 +37,12 @@ interface AIAnalysis {
   suggestedApproach: 'single_analysis' | 'multiple_focused' | 'comprehensive';
 }
 
-// AI-powered intent analysis function
 async function analyzeIntentWithAI(context: string, repoUrl: string): Promise<AIAnalysis | null> {
   if (!context.trim() || context.length < 10) return null;
 
   try {
-    // Get the API base URL from environment or default to localhost
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     
-    // Call the backend API instead of frontend route
     const response = await fetch(`${API_BASE_URL}/api/analyze-intent`, {
       method: 'POST',
       headers: {
@@ -69,7 +66,6 @@ async function analyzeIntentWithAI(context: string, repoUrl: string): Promise<AI
   }
 }
 
-// All task types - including future ones for inspiration and planning
 const suggestedTasks = [
   {
     id: "explore-codebase",
@@ -164,8 +160,7 @@ export default function TaskSelector({
   const [analysisMode, setAnalysisMode] = useState<'quick' | 'smart'>('quick');
   const [toolsInfo, setToolsInfo] = useState<ToolRegistryInfo | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  // Enhanced Smart Analysis state with AI
+  const [error, setError] = useState<string | null>(null);
   const [context, setContext] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -174,12 +169,9 @@ export default function TaskSelector({
     depth: 'comprehensive',
     target_languages: []
   });
-
-  // AI-powered intent detection
   const [aiAnalysis, setAIAnalysis] = useState<AIAnalysis | null>(null);
   const [isAnalyzingIntent, setIsAnalyzingIntent] = useState(false);
 
-  // Helper function to scroll to top smoothly
   const scrollToTop = () => {
     window.scrollTo({
       top: 0,
@@ -187,40 +179,39 @@ export default function TaskSelector({
     });
   };
 
-  // Generate context suggestions
   const suggestions = generateContextSuggestions(repository);
 
-  // Load tools information (optional - for showing available tools)
   useEffect(() => {
     const loadToolsInfo = async () => {
       try {
         const info = await WhisperAPI.getToolsRegistry();
         setToolsInfo(info);
+        setError(null); // Clear any previous errors
       } catch (error) {
         console.log('Tools registry not available:', error);
+        setError('Unable to load analysis tools. Some features may be limited.');
       }
     };
 
     loadToolsInfo();
   }, []);
 
-  // Scroll to top when component mounts or analysis mode changes
   useEffect(() => {
     scrollToTop();
   }, [analysisMode]);
 
-  // Manual AI intent analysis function
   const analyzeIntentManually = async () => {
     if (!context.trim() || context.length < 10) {
+      setError('Please enter at least 10 characters for AI analysis');
       return;
     }
 
     setIsAnalyzingIntent(true);
+    setError(null);
     try {
       const analysis = await analyzeIntentWithAI(context, repository);
       setAIAnalysis(analysis);
       
-      // Auto-configure options based on AI analysis
       if (analysis && analysis.intents.length > 0) {
         const primaryIntent = analysis.intents[0];
         setOptions(prev => ({ 
@@ -228,25 +219,24 @@ export default function TaskSelector({
           scope: primaryIntent.suggestedScope,
           depth: analysis.complexity === 'complex' ? 'comprehensive' : 'deep'
         }));
+      } else {
+        setError('AI analysis could not detect clear intent. Try being more specific about your goals.');
       }
     } catch (error) {
       console.error('Intent analysis failed:', error);
-      // Fallback to simple keyword detection
+      setError('AI analysis failed. Falling back to keyword detection.');
       fallbackToSimpleDetection(context);
     } finally {
       setIsAnalyzingIntent(false);
     }
   };
 
-  // Clear AI analysis when context changes significantly
   useEffect(() => {
-    // Reset analysis when context is cleared or significantly changed
     if (!context.trim()) {
       setAIAnalysis(null);
     }
   }, [context]);
 
-  // Fallback to simple keyword detection if AI fails
   const fallbackToSimpleDetection = (text: string) => {
     const contextLower = text.toLowerCase();
     const detectedIntents: DetectedIntent[] = [];
@@ -314,15 +304,18 @@ export default function TaskSelector({
     return colors[category] || "bg-gray-100 text-gray-800";
   };
 
-  // Smart Analysis helper functions
   const handleSuggestionClick = (suggestion: string) => {
     setContext(suggestion);
     setSelectedSuggestion(suggestion);
   };
 
   const handleSmartSubmit = () => {
-    if (!context.trim()) return;
+    if (!context.trim()) {
+      setError('Please describe your analysis goals before starting');
+      return;
+    }
     
+    setError(null);
     setIsAnalyzing(true);
     onStartSmartTask(context, options);
   };
@@ -332,19 +325,18 @@ export default function TaskSelector({
     setSelectedSuggestion(null);
   };
 
-  // Mode switching handlers
   const handleQuickModeSelect = () => {
     setAnalysisMode('quick');
-    // Clear smart analysis state when switching to quick mode
     setContext("");
     setSelectedSuggestion(null);
     setIsAnalyzing(false);
     setShowAdvanced(false);
+    setError(null);
   };
 
   const handleSmartModeSelect = () => {
     setAnalysisMode('smart');
-    // No need to clear task selection - smart mode operates independently
+    setError(null);
   };
 
   return (
@@ -819,6 +811,18 @@ export default function TaskSelector({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2 text-red-600 dark:text-red-400">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-medium">{error}</span>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

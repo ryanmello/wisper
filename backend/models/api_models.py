@@ -228,8 +228,6 @@ class HealthCheck(BaseModel):
     status: str = Field(..., description="Service status")
     agent_ready: bool = Field(..., description="Whether the analysis agent is ready")
     version: str = Field(default="1.0.0", description="API version")
-    uptime: Optional[float] = Field(None, description="Service uptime in seconds")
-    tools_available: Optional[List[str]] = Field(None, description="Available analysis tools")
 
 class ActiveConnectionsInfo(BaseModel):
     """Model for active connections information."""

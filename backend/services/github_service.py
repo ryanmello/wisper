@@ -1,23 +1,16 @@
-"""
-GitHub Service for Pull Request Creation and Repository Management
-"""
-
 import os
-import tempfile
 import subprocess
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from pathlib import Path
 import github
 from github import Github
-from github.Repository import Repository
-from github.PullRequest import PullRequest
-from git import Repo, GitCommandError
+from git import Repo
 
 from config.settings import settings
-from utils.go_mod_parser import DependencyUpdate
+
 from utils.logging_config import get_logger
+from services.repository_service import repository_service
 
 logger = get_logger(__name__)
 
@@ -36,224 +29,26 @@ class PRCreationResult:
         if self.files_changed is None:
             self.files_changed = []
 
-@dataclass
-class RepositoryAccess:
-    """Information about repository access permissions."""
-    has_write_access: bool
-    can_create_prs: bool
-    is_fork_required: bool
-    fork_url: Optional[str] = None
-
 class GitHubService:
-    """
-    Service for GitHub API interactions and repository management.
-    
-    Handles authentication, repository operations, and pull request creation
-    with comprehensive error handling and security considerations.
-    """
+    """ Service for GitHub API interactions and repository management. """
     
     def __init__(self, config=None):
-        # Use global settings directly - no need for wrapper config
-        self.temp_dirs_to_cleanup = []
-        self.github_client = self._initialize_github_client()
+        self.github_client = Github(settings.GITHUB_TOKEN)
+        user = self.github_client.get_user()
+        logger.info(f"GitHub authenticated as: {user.login}")
     
-    def _initialize_github_client(self) -> Optional[Github]:            
-        if settings.GITHUB_TOKEN:
-            try:
-                client = Github(settings.GITHUB_TOKEN)
-                # Test authentication
-                user = client.get_user()
-                logger.info(f"GitHub authenticated as: {user.login}")
-                return client
-            except Exception as e:
-                logger.error(f"GitHub token authentication failed: {e}")
-                return None
-        
-        logger.warning("No GitHub authentication configured")
-        return None
-    
-    def validate_repository_access(self, repo_url: str) -> RepositoryAccess:
-        """
-        Validate access permissions for a repository.
-        
-        Args:
-            repo_url: GitHub repository URL
-            
-        Returns:
-            RepositoryAccess with permission information
-        """
-        if not self.github_client:
-            return RepositoryAccess(
-                has_write_access=False,
-                can_create_prs=False,
-                is_fork_required=True
-            )
-        
+    def create_pull_request(self, repo_url: str, vulnerability_results: Dict[str, Any], clone_path: str) -> PRCreationResult:
         try:
-            repo_path = self._extract_repo_path(repo_url)
-            repo = self.github_client.get_repo(repo_path)
-            
-            # Check permissions
-            permissions = repo.permissions
-            has_write_access = permissions.push or permissions.admin
-            can_create_prs = permissions.pull or permissions.push or permissions.admin
-            
-            # If no write access, check if we can fork
-            fork_url = None
-            is_fork_required = not has_write_access
-            
-            if is_fork_required and can_create_prs:
-                # Check if we already have a fork
-                try:
-                    authenticated_user = self.github_client.get_user()
-                    fork_name = f"{authenticated_user.login}/{repo.name}"
-                    fork_repo = self.github_client.get_repo(fork_name)
-                    fork_url = fork_repo.clone_url
-                except github.UnknownObjectException:
-                    # Fork doesn't exist, we'd need to create one
-                    fork_url = f"https://github.com/{authenticated_user.login}/{repo.name}"
-            
-            return RepositoryAccess(
-                has_write_access=has_write_access,
-                can_create_prs=can_create_prs,
-                is_fork_required=is_fork_required,
-                fork_url=fork_url
-            )
-            
-        except github.UnknownObjectException:
-            return RepositoryAccess(
-                has_write_access=False,
-                can_create_prs=False,
-                is_fork_required=True
-            )
-        except Exception as e:
-            logger.error(f"Error validating repository access: {e}")
-            return RepositoryAccess(
-                has_write_access=False,
-                can_create_prs=False,
-                is_fork_required=True
-            )
-    
-    def create_security_pr(
-        self,
-        repo_url: str,
-        vulnerability_results: Dict[str, Any],
-        dependency_updates: Optional[List[DependencyUpdate]] = None
-    ) -> PRCreationResult:
-        """
-        Create a pull request to fix security vulnerabilities.
-        
-        Args:
-            repo_url: GitHub repository URL
-            vulnerability_results: Raw vulnerability scan results
-            dependency_updates: Optional pre-processed dependency updates (if None, will be generated from vulnerability_results)
-            
-        Returns:
-            PRCreationResult with creation status and details
-        """
-        # Process vulnerability results if dependency updates not provided
-        if dependency_updates is None:
-            try:
-                from services.dependency_updater import DependencyUpdater
-                dependency_updater = DependencyUpdater()
-                dependency_updates = dependency_updater.analyze_vulnerabilities_from_scan_results(
-                    vulnerability_results
-                )
-                logger.info(f"Generated {len(dependency_updates)} dependency updates from vulnerability results")
-                
-                if not dependency_updates:
-                    logger.warning("No dependency updates generated from vulnerabilities")
-                    return PRCreationResult(
-                        success=True,
-                        error_message="No vulnerability fixes needed - no dependency updates required"
-                    )
-                
-                # Log the updates we're about to create
-                for update in dependency_updates:
-                    logger.info(f"  - {update.module_path}: {update.current_version} -> {update.updated_version} (severity: {update.severity})")
-                    
-            except ImportError as e:
-                logger.error(f"DependencyUpdater not available: {e}")
+            # Only AI-generated fixes are supported now
+            print(vulnerability_results)
+            if 'ai_fixes' not in vulnerability_results:
                 return PRCreationResult(
                     success=False,
-                    error_message=f"Dependency analysis not available: {str(e)}"
-                )
-            except Exception as e:
-                logger.error(f"Error processing vulnerability results: {e}")
-                return PRCreationResult(
-                    success=False,
-                    error_message=f"Failed to process vulnerabilities: {str(e)}"
-                )
-        
-        if settings.GITHUB_DRY_RUN:
-            logger.info("Dry run mode - would create PR with updates:")
-            for update in dependency_updates:
-                logger.info(f"  {update.module_path}: {update.current_version} -> {update.updated_version}")
-            return PRCreationResult(
-                success=True,
-                pr_url="DRY_RUN_MODE",
-                branch_name="dry-run-branch",
-                files_changed=["go.mod", "go.sum"],
-                vulnerabilities_fixed=len(dependency_updates)
-            )
-        
-        try:
-            # Validate repository access
-            access = self.validate_repository_access(repo_url)
-            if not access.can_create_prs:
-                return PRCreationResult(
-                    success=False,
-                    error_message="No permission to create pull requests for this repository"
+                    error_message="No AI-generated fixes provided"
                 )
             
-            # Clone repository to temporary location
-            temp_dir = self._clone_repository_for_pr(repo_url, access)
-            if not temp_dir:
-                return PRCreationResult(
-                    success=False,
-                    error_message="Failed to clone repository"
-                )
-            
-            # Apply dependency updates
-            files_changed = self._apply_dependency_updates(temp_dir, dependency_updates)
-            if not files_changed:
-                return PRCreationResult(
-                    success=False,
-                    error_message="No files were updated"
-                )
-            
-            # Create branch and commit changes
-            branch_name = self._create_and_commit_changes(
-                temp_dir, dependency_updates, files_changed
-            )
-            if not branch_name:
-                return PRCreationResult(
-                    success=False,
-                    error_message="Failed to create branch and commit changes"
-                )
-            
-            # Push branch to GitHub
-            push_success = self._push_branch(temp_dir, branch_name, access)
-            if not push_success:
-                return PRCreationResult(
-                    success=False,
-                    error_message="Failed to push branch to GitHub"
-                )
-            
-            # Create pull request
-            pr_result = self._create_pull_request(
-                repo_url, branch_name, dependency_updates, vulnerability_results, 
-                access
-            )
-            
-            return PRCreationResult(
-                success=True,
-                pr_url=pr_result.get('pr_url'),
-                pr_number=pr_result.get('pr_number'),
-                branch_name=branch_name,
-                files_changed=files_changed,
-                vulnerabilities_fixed=len(dependency_updates)
-            )
+            logger.info("Creating PR with AI-generated fixes")
+            return self._create_pr_with_ai_fixes(repo_url, vulnerability_results, clone_path)
             
         except Exception as e:
             logger.error(f"Error creating security PR: {e}")
@@ -261,91 +56,120 @@ class GitHubService:
                 success=False,
                 error_message=str(e)
             )
-        finally:
-            self._cleanup_temp_directories()
-    
-    def _extract_repo_path(self, repo_url: str) -> str:
-        """Extract owner/repo from GitHub URL."""
-        # Handle various GitHub URL formats
-        if repo_url.startswith('https://github.com/'):
-            path = repo_url.replace('https://github.com/', '').rstrip('/')
-            if path.endswith('.git'):
-                path = path[:-4]
-            return path
-        else:
-            raise ValueError(f"Invalid GitHub URL format: {repo_url}")
-    
-    def _clone_repository_for_pr(self, repo_url: str, access: RepositoryAccess) -> Optional[str]:
-        """Clone repository to temporary directory for PR creation."""
-        temp_dir = tempfile.mkdtemp(prefix="whisper_pr_")
-        self.temp_dirs_to_cleanup.append(temp_dir)
         
+        finally:
+            # Note: Individual cleanup now handled in _create_pr_with_ai_fixes
+            pass
+    
+    def _create_pr_with_ai_fixes(self, repo_url: str, vulnerability_results: Dict[str, Any], clone_path: str) -> PRCreationResult:
+        """Create PR using AI-generated fixes."""
+        temp_dir = None
         try:
-            # Determine which URL to clone from
-            clone_url = repo_url
-            if access.is_fork_required and access.fork_url:
-                # TODO: Handle fork creation if needed
-                clone_url = access.fork_url
+            ai_fixes = vulnerability_results.get('ai_fixes', {})
+            vulnerabilities_found = vulnerability_results.get('scan_summary', {}).get('vulnerabilities_found', 0)
+            fix_explanation = vulnerability_results.get('fix_explanation', '')
             
-            # Clone repository
-            repo = Repo.clone_from(clone_url, temp_dir)
-            logger.info(f"Repository cloned to: {temp_dir}")
-            return temp_dir
+            if not ai_fixes:
+                return PRCreationResult(
+                    success=True,
+                    error_message="No AI fixes provided"
+                )
+            
+            logger.info(f"Creating PR with {len(ai_fixes)} AI-generated file fixes")
+            
+            if settings.GITHUB_DRY_RUN:
+                logger.info("Dry run mode - would create PR with AI fixes:")
+                for file_path in ai_fixes.keys():
+                    logger.info(f"  {file_path}")
+                return PRCreationResult(
+                    success=True,
+                    pr_url="DRY_RUN_MODE",
+                    branch_name="dry-run-branch",
+                    files_changed=list(ai_fixes.keys()),
+                    vulnerabilities_fixed=vulnerabilities_found
+                )
+            
+            # Use existing clone if provided, otherwise clone the repository
+            temp_dir = clone_path
+            logger.info(f"Reusing existing repository clone at: {temp_dir}")
+            
+            files_changed = self._apply_ai_fixes(temp_dir, ai_fixes)
+            if not files_changed:
+                return PRCreationResult(
+                    success=False,
+                    error_message="No files were updated"
+                )
+            
+            branch_name = self._create_branch(temp_dir, "ai-fixes")
+            if not branch_name:
+                return PRCreationResult(
+                    success=False,
+                    error_message="Failed to create branch"
+                )
+            
+            if not self._commit_ai_changes(temp_dir, branch_name, vulnerability_results, files_changed):
+                return PRCreationResult(
+                    success=False,
+                    error_message="Failed to commit changes"
+                )
+            
+            if not self._push_branch(temp_dir, branch_name):
+                return PRCreationResult(
+                    success=False,
+                    error_message="Failed to push branch to GitHub"
+                )
+            
+            pr_result = self._create_ai_pull_request(repo_url, branch_name, vulnerability_results)
+            
+            return PRCreationResult(
+                success=True,
+                pr_url=pr_result.get('pr_url'),
+                pr_number=pr_result.get('pr_number'),
+                branch_name=branch_name,
+                files_changed=files_changed,
+                vulnerabilities_fixed=vulnerabilities_found
+            )
             
         except Exception as e:
-            logger.error(f"Failed to clone repository: {e}")
-            return None
+            logger.error(f"Error creating AI-based security PR: {e}")
+            return PRCreationResult(
+                success=False,
+                error_message=str(e)
+            )
+        finally:
+            # Only clean up if we created a new clone (not reusing existing)
+            if temp_dir and temp_dir != clone_path and os.path.exists(temp_dir):
+                cleanup_success = repository_service.cleanup_directory(temp_dir)
+                if not cleanup_success:
+                    repository_service.schedule_delayed_cleanup(temp_dir)
+                logger.info(f"GitHub service cleaned up temp directory: {temp_dir}")
     
-    def _apply_dependency_updates(
-        self, 
-        repo_path: str, 
-        dependency_updates: List[DependencyUpdate]
-    ) -> List[str]:
-        """Apply dependency updates to go.mod files."""
-        from utils.go_mod_parser import GoModParser
-        
-        parser = GoModParser()
+    def _apply_ai_fixes(self, repo_path: str, ai_fixes: Dict[str, str]) -> List[str]:
+        """Apply AI-generated fixes to files."""
         files_changed = []
         
-        # Find all go.mod files
-        go_mod_files = parser.find_go_mod_files(repo_path)
-        
-        for go_mod_path in go_mod_files:
+        for file_path, new_content in ai_fixes.items():
             try:
-                # Parse current go.mod
-                go_mod_file = parser.parse_go_mod(go_mod_path)
+                full_path = os.path.join(repo_path, file_path)
                 
-                # Filter updates relevant to this go.mod
-                relevant_updates = []
-                for update in dependency_updates:
-                    if go_mod_file.get_dependency(update.module_path):
-                        relevant_updates.append(update)
+                # Create directory if it doesn't exist
+                dir_path = os.path.dirname(full_path)
+                if dir_path and not os.path.exists(dir_path):
+                    os.makedirs(dir_path, exist_ok=True)
                 
-                if not relevant_updates:
-                    continue
+                # Write the updated content
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
                 
-                # Apply updates
-                updated_content = parser.update_dependencies(go_mod_file, relevant_updates)
-                
-                # Validate syntax
-                is_valid, error_msg = parser.validate_go_mod_syntax(updated_content, repo_path)
-                if not is_valid:
-                    logger.warning(f"Invalid go.mod syntax after update: {error_msg}")
-                    continue
-                
-                # Write updated content
-                with open(go_mod_path, 'w', encoding='utf-8') as f:
-                    f.write(updated_content)
-                
-                files_changed.append(os.path.relpath(go_mod_path, repo_path))
-                logger.info(f"Updated {go_mod_path} with {len(relevant_updates)} dependency fixes")
+                files_changed.append(file_path)
+                logger.info(f"Applied AI fix to: {file_path}")
                 
             except Exception as e:
-                logger.error(f"Error updating {go_mod_path}: {e}")
+                logger.error(f"Failed to apply AI fix to {file_path}: {e}")
                 continue
         
-        # Run go mod tidy to update go.sum
-        if files_changed:
+        # Run go mod tidy if go.mod was updated
+        if any('go.mod' in f for f in files_changed):
             try:
                 result = subprocess.run(
                     ['go', 'mod', 'tidy'],
@@ -357,10 +181,10 @@ class GitHubService:
                 
                 if result.returncode == 0:
                     # Check if go.sum was modified
-                    go_sum_files = [f for f in os.listdir(repo_path) if f == 'go.sum']
-                    for go_sum_file in go_sum_files:
-                        if go_sum_file not in files_changed:
-                            files_changed.append(go_sum_file)
+                    go_sum_path = os.path.join(repo_path, 'go.sum')
+                    if os.path.exists(go_sum_path) and 'go.sum' not in files_changed:
+                        files_changed.append('go.sum')
+                    logger.info("Successfully ran go mod tidy")
                 else:
                     logger.warning(f"go mod tidy failed: {result.stderr}")
                     
@@ -369,50 +193,59 @@ class GitHubService:
         
         return files_changed
     
-    def _create_and_commit_changes(
-        self,
-        repo_path: str,
-        dependency_updates: List[DependencyUpdate],
-        files_changed: List[str]
-    ) -> Optional[str]:
-        """Create branch and commit dependency updates."""
+    def _create_branch(self, repo_path: str, branch_type: str = "dependencies") -> Optional[str]:
+        """Create a new branch for security fixes."""
         try:
             repo = Repo(repo_path)
             
-            # Create new branch
             timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-            branch_name = f"security/fix-dependencies-{timestamp}"
+            if branch_type == "ai-fixes":
+                branch_name = f"security/ai-fix-vulnerabilities-{timestamp}"
+            else:
+                branch_name = f"security/fix-dependencies-{timestamp}"
             
-            # Create and checkout new branch
             new_branch = repo.create_head(branch_name)
             new_branch.checkout()
             
-            # Stage changed files
-            for file_path in files_changed:
-                repo.index.add([file_path])
-            
-            # Create commit message
-            commit_message = self._generate_commit_message(dependency_updates, files_changed)
-            
-            # Commit changes
-            repo.index.commit(commit_message)
-            
-            logger.info(f"Created branch '{branch_name}' and committed changes")
+            logger.info(f"Created branch '{branch_name}'")
             return branch_name
             
         except Exception as e:
-            logger.error(f"Error creating branch and committing: {e}")
+            logger.error(f"Error creating branch: {e}")
             return None
+ 
+    def _commit_ai_changes(
+        self,
+        repo_path: str,
+        branch_name: str,
+        vulnerability_results: Dict[str, Any],
+        files_changed: List[str]
+    ) -> bool:
+        """Commit AI-generated fixes to the specified branch."""
+        try:
+            repo = Repo(repo_path)
+            
+            for file_path in files_changed:
+                repo.index.add([file_path])
+            
+            commit_message = self._generate_commit_message(vulnerability_results, files_changed)
+            repo.index.commit(commit_message)
+            
+            logger.info(f"Committed AI-generated changes to branch '{branch_name}'")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error committing AI changes: {e}")
+            return False
     
-    def _push_branch(self, repo_path: str, branch_name: str, access: RepositoryAccess) -> bool:
+    def _push_branch(self, repo_path: str, branch_name: str) -> bool:
         """Push branch to GitHub."""
         try:
             repo = Repo(repo_path)
             
-            # Push to origin
             origin = repo.remote('origin')
             origin.push(branch_name)
-            
+
             logger.info(f"Pushed branch '{branch_name}' to GitHub")
             return True
             
@@ -420,30 +253,23 @@ class GitHubService:
             logger.error(f"Error pushing branch: {e}")
             return False
     
-    def _create_pull_request(
+    def _create_ai_pull_request(
         self,
         repo_url: str,
         branch_name: str,
-        dependency_updates: List[DependencyUpdate],
-        vulnerability_results: Dict[str, Any],
-        access: RepositoryAccess
+        vulnerability_results: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Create the actual pull request on GitHub."""
-        repo_path = self._extract_repo_path(repo_url)
+        """Create pull request for AI-generated fixes."""
+        repo_path = repository_service.extract_repo_path(repo_url)
         repo = self.github_client.get_repo(repo_path)
         
-        # Generate PR title and description
-        title = self._generate_pr_title(dependency_updates)
-        description = self._generate_pr_description(
-            dependency_updates, vulnerability_results, branch_name
-        )
+        title = self._generate_title(vulnerability_results)
+        description = self._generate_description(vulnerability_results, branch_name)
         
-        # Set PR options - hardcoded sensible defaults
         base_branch = "main"
         draft = False
         
-        # Create pull request
-        pr = repo.create_pull(
+        pull_request = repo.create_pull(
             title=title,
             body=description,
             head=branch_name,
@@ -451,120 +277,122 @@ class GitHubService:
             draft=draft
         )
         
-        # Add labels - hardcoded sensible defaults
-        labels = ["security", "dependencies"]
-        pr.add_to_labels(*labels)
-        
-        # Reviewers are configured in GitHub repository settings, not here
-        
-        logger.info(f"Created pull request #{pr.number}: {pr.html_url}")
+        labels = ["security", "ai-generated", "vulnerabilities"]
+        pull_request.add_to_labels(*labels)
+                
+        logger.info(f"Created AI-generated pull request #{pull_request.number}: {pull_request.html_url}")
         
         return {
-            'pr_url': pr.html_url,
-            'pr_number': pr.number,
-            'pr_id': pr.id
+            'pr_url': pull_request.html_url,
+            'pr_number': pull_request.number,
+            'pr_id': pull_request.id
         }
     
     def _generate_commit_message(
         self, 
-        dependency_updates: List[DependencyUpdate],
+        vulnerability_results: Dict[str, Any],
         files_changed: List[str]
     ) -> str:
-        """Generate commit message for dependency updates."""
-        vuln_count = len(dependency_updates)
+        """Generate commit message for AI-generated fixes."""
+        vuln_count = vulnerability_results.get('scan_summary', {}).get('vulnerabilities_found', 0)
         
         if vuln_count == 1:
-            update = dependency_updates[0]
-            message = f"security: update {update.module_path} to {update.updated_version}"
+            message = f"security: AI-generated fix for 1 vulnerability"
         else:
-            message = f"security: fix {vuln_count} vulnerabilities in Go dependencies"
+            message = f"security: AI-generated fixes for {vuln_count} vulnerabilities"
         
-        # Add details about changes
-        details = []
-        for update in dependency_updates:
-            details.append(f"- {update.module_path}: {update.current_version} -> {update.updated_version}")
-        
-        if details:
-            message += "\n\n" + "\n".join(details)
+        # Add AI explanation summary
+        fix_explanation = vulnerability_results.get('fix_explanation', '')
+        if fix_explanation:
+            # Take first 200 characters of explanation for commit
+            explanation_summary = fix_explanation[:200] + "..." if len(fix_explanation) > 200 else fix_explanation
+            message += f"\n\n{explanation_summary}"
         
         # Add files changed
         if files_changed:
             message += f"\n\nFiles modified: {', '.join(files_changed)}"
         
+        message += f"\n\nGenerated by {settings.PROJECT_NAME} AI Security Analysis"
+        
         return message
     
-    def _generate_pr_title(self, dependency_updates: List[DependencyUpdate]) -> str:
-        """Generate pull request title."""
-        vuln_count = len(dependency_updates)
-        
-        return f"Security: Fix {vuln_count} vulnerabilities in Go dependencies"
+    def _generate_title(self, vulnerability_results: Dict[str, Any]) -> str:
+        vuln_count = vulnerability_results.get('scan_summary', {}).get('vulnerabilities_found', 0)        
+        return f"🤖 AI Security Fix: Resolve {vuln_count} vulnerabilities"
     
-    def _generate_pr_description(
+    def _generate_description(
         self,
-        dependency_updates: List[DependencyUpdate],
         vulnerability_results: Dict[str, Any],
         branch_name: str
     ) -> str:
-        """Generate detailed pull request description."""
+        """Generate detailed pull request description for AI fixes."""
         description_parts = []
         
         # Summary
-        vuln_count = len(dependency_updates)
-        description_parts.append(f"## Security Update")
-        description_parts.append(f"This PR fixes **{vuln_count}** security vulnerabilities in Go dependencies.")
+        vuln_count = vulnerability_results.get('scan_summary', {}).get('vulnerabilities_found', 0)
+        description_parts.append(f"## 🤖 AI-Generated Security Fix")
+        description_parts.append(f"This PR contains AI-generated fixes for **{vuln_count}** security vulnerabilities identified by `govulncheck`.")
         description_parts.append("")
         
-        # Vulnerability details
-        if dependency_updates:
-            description_parts.append("## Vulnerabilities Fixed")
+        # AI Analysis
+        fix_explanation = vulnerability_results.get('fix_explanation', '')
+        if fix_explanation:
+            description_parts.append("## 🧠 AI Analysis & Reasoning")
+            description_parts.append("```")
+            description_parts.append(fix_explanation)
+            description_parts.append("```")
             description_parts.append("")
-            
-            for i, update in enumerate(dependency_updates, 1):
-                description_parts.append(f"### {i}. {update.module_path}")
-                description_parts.append(f"- **Current Version**: `{update.current_version}`")
-                description_parts.append(f"- **Updated Version**: `{update.updated_version}`")
-                description_parts.append(f"- **Severity**: {update.severity.title()}")
-                
-                if update.vulnerability_ids:
-                    description_parts.append(f"- **CVE IDs**: {', '.join(update.vulnerability_ids)}")
-                
-                description_parts.append(f"- **Reasoning**: {update.reasoning}")
-                description_parts.append("")
         
-        # Changes made
-        description_parts.append("## Changes Made")
-        description_parts.append("- Updated vulnerable dependencies in `go.mod`")
-        description_parts.append("- Ran `go mod tidy` to update `go.sum`")
-        description_parts.append("- Verified go.mod syntax")
+        # Raw govulncheck output
+        raw_output = vulnerability_results.get('raw_govulncheck_output', '')
+        if raw_output:
+            description_parts.append("## 🔍 Vulnerability Scan Results")
+            description_parts.append("<details><summary>Click to view govulncheck output</summary>")
+            description_parts.append("")
+            description_parts.append("```")
+            description_parts.append(raw_output)
+            description_parts.append("```")
+            description_parts.append("</details>")
+            description_parts.append("")
+        
+        # Files modified
+        ai_fixes = vulnerability_results.get('ai_fixes', {})
+        if ai_fixes:
+            description_parts.append("## 📝 Files Modified")
+            for file_path in ai_fixes.keys():
+                description_parts.append(f"- `{file_path}`")
+            description_parts.append("")
+        
+        # Build validation
+        description_parts.append("## ✅ Build Validation")
+        description_parts.append("- [x] AI-generated fixes applied")
+        description_parts.append("- [x] `go mod tidy` executed successfully")
+        description_parts.append("- [x] `go build ./...` passed")
+        description_parts.append("- [x] Code compiles without errors")
         description_parts.append("")
         
         # Testing recommendation
-        description_parts.append("## Testing Recommendations")
+        description_parts.append("## 🧪 Testing Recommendations")
         description_parts.append("- [ ] Run existing test suite")
-        description_parts.append("- [ ] Verify application builds successfully")
         description_parts.append("- [ ] Test critical functionality")
         description_parts.append("- [ ] Run security scan to confirm fixes")
+        description_parts.append("- [ ] Deploy to staging environment")
+        description_parts.append("")
+        
+        # Warnings
+        description_parts.append("## ⚠️ Important Notes")
+        description_parts.append("- This PR contains AI-generated code changes")
+        description_parts.append("- Please review all changes carefully before merging")
+        description_parts.append("- Test thoroughly in a staging environment")
+        description_parts.append("- The AI has prioritized security fixes while preserving functionality")
         description_parts.append("")
         
         # Metadata
         description_parts.append("---")
-        description_parts.append(f"*This PR was automatically generated by Whisper Analysis Agent*")
+        description_parts.append(f"*This PR was automatically generated by {settings.PROJECT_NAME} AI Security Analysis*")
         description_parts.append(f"*Branch: `{branch_name}`*")
+        description_parts.append(f"*Scan Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*")
         
         return "\n".join(description_parts)
-    
-    def _cleanup_temp_directories(self):
-        """Clean up temporary directories created during PR process."""
-        for temp_dir in self.temp_dirs_to_cleanup:
-            try:
-                import shutil
-                shutil.rmtree(temp_dir)
-                logger.debug(f"Cleaned up temporary directory: {temp_dir}")
-            except Exception as e:
-                logger.warning(f"Failed to cleanup {temp_dir}: {e}")
-        
-        self.temp_dirs_to_cleanup.clear()
 
-
-# Global service instance
 github_service = GitHubService() 

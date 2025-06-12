@@ -50,8 +50,6 @@ export default function TaskExecution({ repository, task, onBack }: TaskExecutio
         setIsConnecting(true);
         setError(null);
 
-        // Create task
-        console.log('Creating task for repository:', repository);
         const taskResponse = await WhisperAPI.createTask(repository, task);
         
         if (!mounted) return;
@@ -59,7 +57,6 @@ export default function TaskExecution({ repository, task, onBack }: TaskExecutio
         setTaskId(taskResponse.task_id);
         setCurrentStep("Connecting to analysis service...");
 
-        // Connect WebSocket
         const ws = WhisperAPI.connectWebSocket(
           taskResponse.websocket_url,
           taskResponse.task_id,
@@ -67,8 +64,6 @@ export default function TaskExecution({ repository, task, onBack }: TaskExecutio
           task,
           (data: AnalysisProgress) => {
             if (!mounted) return;
-
-            console.log('WebSocket message:', data);
 
             switch (data.type) {
               case 'task.started':
@@ -108,7 +103,6 @@ export default function TaskExecution({ repository, task, onBack }: TaskExecutio
           },
           (event: CloseEvent) => {
             if (!mounted) return;
-            console.log('WebSocket closed:', event.code, event.reason);
             if (event.code !== 1000 && !isCompleted) {
               setError(`Connection closed unexpectedly (${event.code})`);
             }
@@ -149,7 +143,7 @@ export default function TaskExecution({ repository, task, onBack }: TaskExecutio
   const repoName = extractRepoName(repository);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">

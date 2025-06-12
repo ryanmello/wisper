@@ -18,14 +18,8 @@ logger = get_logger(__name__)
 analysis_service: AnalysisService = None
 start_time = time.time()
 
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    
-    app = FastAPI(
-        title=settings.API_TITLE,
-        version=settings.API_VERSION,
-        description=settings.API_DESCRIPTION
-    )
+def create_app() -> FastAPI:    
+    app = FastAPI()
     
     # Add CORS middleware
     app.add_middleware(
@@ -50,27 +44,21 @@ async def startup_event():
     global analysis_service
     
     if not settings.OPENAI_API_KEY:
-        logger.warning("OPENAI_API_KEY not found in environment variables")
-        openai_api_key = "dummy-key"  # For testing without real API
-    else:
-        openai_api_key = settings.OPENAI_API_KEY
+        raise ValueError("OPENAI_API_KEY is required but not set in environment variables")
+    if not settings.GITHUB_TOKEN:
+        raise ValueError("GITHUB_TOKEN is required but not set in environment variables")
     
-    analysis_service = AnalysisService(openai_api_key=openai_api_key)
+    analysis_service = AnalysisService(openai_api_key=settings.OPENAI_API_KEY)
     logger.info("Analysis service initialized successfully")
 
 async def shutdown_event():
     """Clean up resources on shutdown."""
     global analysis_service
+    
     if analysis_service:
-        # Cleanup any active connections
         for task_id in list(analysis_service.active_connections.keys()):
             await analysis_service.disconnect_websocket(task_id)
         logger.info("Analysis service shutdown complete")
 
 def get_analysis_service() -> AnalysisService:
-    """Get the global analysis service instance."""
     return analysis_service
-
-def get_uptime() -> float:
-    """Get application uptime in seconds."""
-    return time.time() - start_time 

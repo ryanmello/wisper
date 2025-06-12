@@ -99,7 +99,6 @@ async def analyze_intent(request: IntentAnalysisRequest):
 
 @router.post("/tasks/", response_model=AnalysisResponse)
 async def create_analysis_task(request: AnalysisRequest):
-    """Create a new repository analysis task (legacy endpoint)."""
     analysis_service = get_analysis_service()
     if analysis_service is None:
         raise HTTPException(status_code=503, detail="Analysis service not available")

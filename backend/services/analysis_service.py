@@ -1,14 +1,9 @@
-"""
-Analysis Service - Manages repository analysis tasks and WebSocket connections
-"""
-
 import asyncio
 import json
 import uuid
 from typing import Dict, Any, Optional
 from fastapi import WebSocket
 import logging
-
 from agents.codebase_exploration_agent import CodebaseExplorationAgent
 from agents.dependency_audit_agent import DependencyAuditAgent
 from agents.smart_analysis_agent import SmartAnalysisAgent
@@ -64,31 +59,26 @@ class AnalysisService:
         depth: str = "comprehensive",
         additional_params: Optional[Dict] = None
     ) -> str:
-        """Create a new smart analysis task and return task ID."""
         task_id = str(uuid.uuid4())
         logger.info(f"Created smart analysis task {task_id} for repository: {repository_url}")
         logger.info(f"Context: {context[:100]}...")
         return task_id
     
     async def connect_websocket(self, task_id: str, websocket: WebSocket):
-        """Connect a WebSocket for real-time updates."""
         await websocket.accept()
         self.active_connections[task_id] = websocket
         logger.info(f"WebSocket connected for task {task_id}")
     
     async def disconnect_websocket(self, task_id: str):
-        """Disconnect and cleanup WebSocket connection."""
         if task_id in self.active_connections:
             del self.active_connections[task_id]
         
-        # Cancel any running task
         if task_id in self.active_tasks:
             task = self.active_tasks[task_id]
             if isinstance(task, asyncio.Task):
                 task.cancel()
             del self.active_tasks[task_id]
         
-        # Clean up task metadata
         if task_id in self.task_metadata:
             del self.task_metadata[task_id]
         
@@ -108,17 +98,15 @@ class AnalysisService:
         task_id: str, 
         repository_url: str, 
         task_type: str = "explore-codebase"
-    ):
-        """Start repository analysis with real-time updates (legacy method)."""
-        
+    ):        
         try:
             await self._run_analysis(task_id, repository_url, task_type)
         except asyncio.CancelledError:
             logger.info(f"Analysis task {task_id} was cancelled")
-            raise  # Re-raise so the outer task can handle cancellation
+            raise
         except Exception as e:
             logger.error(f"Analysis task {task_id} failed: {e}")
-            raise  # Re-raise so the outer task can handle the error
+            raise
     
     async def start_smart_analysis(
         self, 
@@ -133,21 +121,19 @@ class AnalysisService:
     ):
         """Start smart repository analysis with AI-powered tool selection."""
         
-        # Ensure service is initialized
         await self.initialize()
         
         try:
-            # Directly run the smart analysis (no nested task creation)
             await self._run_smart_analysis(
                 task_id, repository_url, context, intent, target_languages, 
                 scope, depth, additional_params
             )
         except asyncio.CancelledError:
             logger.info(f"Smart analysis task {task_id} was cancelled")
-            raise  # Re-raise so the outer task can handle cancellation
+            raise
         except Exception as e:
             logger.error(f"Smart analysis task {task_id} failed: {e}")
-            raise  # Re-raise so the outer task can handle the error
+            raise
     
     async def _run_analysis(
         self, 
@@ -159,10 +145,8 @@ class AnalysisService:
         try:
             await self._send_task_started(task_id, repository_url, task_type)
             
-            # Create and configure agent for the task
             agent = self._create_agent(task_type)
             
-            # Process analysis updates
             async for update in agent.analyze_repository(repository_url):
                 await self._handle_analysis_update(task_id, update, task_type)
                 
@@ -173,7 +157,6 @@ class AnalysisService:
             await self._handle_analysis_error(task_id, e, "analysis_execution")
 
     def _create_agent(self, task_type: str):
-        """Create the appropriate agent based on task type."""
         agent_map = {
             "dependency-audit": DependencyAuditAgent,
             "explore-codebase": CodebaseExplorationAgent
@@ -234,15 +217,13 @@ class AnalysisService:
         """Format dependency audit specific results."""
         formatted = {
             "dependency_audit": {
-                "summary": results.get("summary", "Audit completed"),
+                "summary": results.get("summary", "Vulnerability audit completed"),
                 "vulnerability_scan": results.get("vulnerability_scan", {}),
                 "github_pr": results.get("github_pr", {}),
-                "dependencies": results.get("dependencies", {}),
-                "primary_language": results.get("primary_language", "Unknown")
+                "build_validation": results.get("build_validation", {})
             }
         }
         
-        # Include vulnerability scan in main results for frontend compatibility
         if results.get("vulnerability_scan"):
             formatted["vulnerability_scanner"] = results["vulnerability_scan"]
             

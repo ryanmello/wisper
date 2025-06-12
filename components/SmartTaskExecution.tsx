@@ -59,7 +59,6 @@ export default function SmartTaskExecution({
           ...options
         };
 
-        console.log('Creating smart analysis task:', request);
         const taskResponse = await WhisperAPI.createSmartTask(request);
         
         if (!mounted) return;
@@ -75,7 +74,6 @@ export default function SmartTaskExecution({
           (data: SmartAnalysisProgress) => {
             if (!mounted) return;
 
-            console.log('Smart WebSocket message:', data);
 
             switch (data.type) {
               case 'progress':
@@ -166,7 +164,6 @@ export default function SmartTaskExecution({
           },
           (event: CloseEvent) => {
             if (!mounted) return;
-            console.log('Smart WebSocket closed:', event.code, event.reason);
             if (event.code !== 1000 && !isCompleted) {
               setError(`Connection closed unexpectedly (${event.code})`);
             }

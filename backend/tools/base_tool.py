@@ -76,7 +76,6 @@ class BaseTool(ABC):
         self._is_healthy = True
         self._last_health_check = None
     
-    @abstractmethod
     def _create_metadata(self) -> ToolMetadata:
         """Create and return tool metadata."""
         pass
@@ -86,7 +85,6 @@ class BaseTool(ABC):
         """Get tool metadata."""
         return self._metadata
     
-    @abstractmethod
     async def execute(self, context: AnalysisContext, **kwargs) -> ToolResult:
         """
         Execute the tool with the given context.
@@ -99,8 +97,7 @@ class BaseTool(ABC):
             ToolResult containing the analysis results
         """
         pass
-    
-    @abstractmethod
+
     def validate_context(self, context: AnalysisContext) -> tuple[bool, List[str]]:
         """
         Validate that the context is suitable for this tool.
