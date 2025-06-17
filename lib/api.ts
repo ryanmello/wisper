@@ -1,11 +1,7 @@
-// API service for communicating with the FastAPI backend
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Task type validation
 export type TaskType = 'explore-codebase' | 'dependency-audit';
 
-// Legacy types (keeping for backward compatibility)
 export interface TaskResponse {
   task_id: string;
   status: string;
@@ -44,7 +40,6 @@ export interface AnalysisProgress {
   error?: string;
 }
 
-// New Smart Analysis Types
 export interface SmartAnalysisRequest {
   repository_url: string;
   context: string;
@@ -142,9 +137,6 @@ export interface HealthCheck {
 }
 
 export class WhisperAPI {
-  /**
-   * Create a new analysis task (legacy method)
-   */
   static async createTask(repositoryUrl: string, taskType: TaskType = 'explore-codebase'): Promise<TaskResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/tasks/`, {
@@ -169,9 +161,6 @@ export class WhisperAPI {
     }
   }
 
-  /**
-   * Create a new smart analysis task
-   */
   static async createSmartTask(request: SmartAnalysisRequest): Promise<SmartAnalysisResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/smart-tasks/`, {
@@ -193,9 +182,6 @@ export class WhisperAPI {
     }
   }
 
-  /**
-   * Get task status
-   */
   static async getTaskStatus(taskId: string): Promise<Record<string, unknown>> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`);
@@ -211,9 +197,6 @@ export class WhisperAPI {
     }
   }
 
-  /**
-   * Get tools registry information
-   */
   static async getToolsRegistry(): Promise<ToolRegistryInfo> {
     try {
       const response = await fetch(`${API_BASE_URL}/api/tools`);
@@ -229,9 +212,6 @@ export class WhisperAPI {
     }
   }
 
-  /**
-   * Connect to WebSocket for real-time updates (legacy)
-   */
   static connectWebSocket(
     websocketUrl: string,
     taskId: string,
@@ -244,8 +224,6 @@ export class WhisperAPI {
     const ws = new WebSocket(websocketUrl);
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
-      // Send task parameters to start analysis
       ws.send(JSON.stringify({
         repository_url: repositoryUrl,
         task_type: taskType,
@@ -274,9 +252,6 @@ export class WhisperAPI {
     return ws;
   }
 
-  /**
-   * Connect to WebSocket for smart analysis real-time updates
-   */
   static connectSmartWebSocket(
     websocketUrl: string,
     taskId: string,
@@ -288,8 +263,6 @@ export class WhisperAPI {
     const ws = new WebSocket(websocketUrl);
 
     ws.onopen = () => {
-      console.log('Smart WebSocket connected');
-      // Send smart task parameters to start analysis
       ws.send(JSON.stringify(request));
     };
 
@@ -308,25 +281,18 @@ export class WhisperAPI {
     };
 
     ws.onclose = (event) => {
-      console.log('Smart WebSocket closed:', event.code, event.reason);
       onClose(event);
     };
 
     return ws;
   }
 
-  /**
-   * Cancel a running task
-   */
   static cancelTask(ws: WebSocket): void {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'cancel' }));
     }
   }
 
-  /**
-   * Check if backend is healthy
-   */
   static async healthCheck(): Promise<HealthCheck> {
     try {
       const response = await fetch(`${API_BASE_URL}/health`);
@@ -340,9 +306,6 @@ export class WhisperAPI {
     }
   }
 
-  /**
-   * Check if smart analysis is available
-   */
   static async isSmartAnalysisAvailable(): Promise<boolean> {
     try {
       const health = await this.healthCheck();
@@ -352,29 +315,18 @@ export class WhisperAPI {
       return false;
     }
   }
-
-
 }
 
-/**
- * Utility function to validate GitHub repository URL
- */
 export function validateGitHubUrl(url: string): boolean {
   const githubUrlPattern = /^https:\/\/github\.com\/[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+\/?$/;
   return githubUrlPattern.test(url);
 }
 
-/**
- * Extract repository name from GitHub URL
- */
 export function extractRepoName(url: string): string {
   const match = url.match(/github\.com\/([^\/]+\/[^\/]+)/);
   return match ? match[1] : url;
 }
 
-/**
- * Generate context suggestions based on repository information
- */
 export function generateContextSuggestions(repoUrl: string, detectedLanguage?: string): string[] {
   const suggestions = [
     'explore this codebase and provide an architectural overview',
@@ -385,7 +337,6 @@ export function generateContextSuggestions(repoUrl: string, detectedLanguage?: s
     'analyze dependencies for security issues and updates needed',
   ];
 
-  // Language-specific suggestions
   if (detectedLanguage) {
     const languageSpecific: Record<string, string[]> = {
       go: [

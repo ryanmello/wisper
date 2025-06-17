@@ -1,5 +1,8 @@
 import uvicorn
+from core.app import create_app
 from config.settings import settings
+
+app = create_app()
 
 def main():
     print(f"   Starting {settings.PROJECT_NAME}")
@@ -11,7 +14,7 @@ def main():
     print(f"   API Docs: http://{settings.HOST}:{settings.PORT}/docs")
     
     uvicorn.run(
-        "app:app",
+        "main:app",
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.RELOAD,
