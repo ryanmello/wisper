@@ -1,18 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavigationHeader, StepIndicator } from "@/components/ui/navigation";
 import RepositorySelector from "@/components/RepositorySelector";
 import TaskSelector from "@/components/TaskSelector";
 import TaskExecution from "@/components/TaskExecution";
 import SmartTaskExecution from "@/components/SmartTaskExecution";
-import { TaskType } from "@/lib/api";
+import Results from "@/components/TaskResults";
+import { TaskType, AnalysisProgress, SmartAnalysisResults } from "@/lib/api";
+import { getRepoName, scrollToTop } from "@/lib/utils";
 
-type Step = "repository" | "task" | "execution" | "smart-execution";
+type Step = "repository" | "task" | "execution" | "smart-execution" | "results";
 
 interface SmartAnalysisOptions {
-  scope?: 'full' | 'security_focused' | 'performance_focused';
-  depth?: 'surface' | 'deep' | 'comprehensive';
+  scope?: "full" | "security_focused" | "performance_focused";
+  depth?: "surface" | "deep" | "comprehensive";
   target_languages?: string[];
 }
 
@@ -20,38 +22,36 @@ const STEPS = [
   {
     id: "repository",
     label: "Repository",
-    description: "Select source"
+    description: "Select source",
   },
   {
     id: "task",
     label: "Task",
-    description: "Choose analysis"
+    description: "Choose analysis",
   },
   {
     id: "execution",
     label: "Execution",
-    description: "Run analysis"
-  }
+    description: "Run analysis",
+  },
+  {
+    id: "results",
+    label: "Results",
+    description: "View findings",
+  },
 ];
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<Step>("repository");
   const [selectedRepository, setSelectedRepository] = useState<string>("");
   const [selectedTask, setSelectedTask] = useState<TaskType | null>(null);
-  
-  // Smart analysis state
   const [smartAnalysisContext, setSmartAnalysisContext] = useState<string>("");
-  const [smartAnalysisOptions, setSmartAnalysisOptions] = useState<SmartAnalysisOptions>({});
+  const [smartAnalysisOptions, setSmartAnalysisOptions] =
+    useState<SmartAnalysisOptions>({});
+  const [analysisResults, setAnalysisResults] = useState<
+    AnalysisProgress["results"] | SmartAnalysisResults | null
+  >(null);
 
-  // Helper function to scroll to top smoothly
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  };
-
-  // Scroll to top whenever the step changes
   useEffect(() => {
     scrollToTop();
   }, [currentStep]);
@@ -59,7 +59,6 @@ export default function Home() {
   const handleRepositorySelect = (repo: string) => {
     setSelectedRepository(repo);
     setCurrentStep("task");
-    // Scroll to top when navigating to task selection
     scrollToTop();
   };
 
@@ -69,15 +68,34 @@ export default function Home() {
 
   const handleStartTask = () => {
     setCurrentStep("execution");
-    // Scroll to top when starting task execution
     scrollToTop();
   };
 
-  const handleStartSmartTask = (context: string, options?: SmartAnalysisOptions) => {
+  const handleStartSmartTask = (
+    context: string,
+    options?: SmartAnalysisOptions
+  ) => {
     setSmartAnalysisContext(context);
     setSmartAnalysisOptions(options || {});
     setCurrentStep("smart-execution");
-    // Scroll to top when starting smart analysis
+    scrollToTop();
+  };
+
+  const handleTaskComplete = useCallback(
+    (results: AnalysisProgress["results"] | SmartAnalysisResults) => {
+      setAnalysisResults(results);
+      setCurrentStep("results");
+      scrollToTop();
+    },
+    []
+  );
+
+  const handleNewAnalysis = () => {
+    setCurrentStep("task");
+    setSelectedTask(null);
+    setSmartAnalysisContext("");
+    setSmartAnalysisOptions({});
+    setAnalysisResults(null);
     scrollToTop();
   };
 
@@ -95,11 +113,14 @@ export default function Home() {
         setSmartAnalysisContext("");
         setSmartAnalysisOptions({});
         break;
+      case "results":
+        setCurrentStep("task");
+        setAnalysisResults(null);
+        break;
       default:
         setCurrentStep("repository");
         break;
     }
-    // Scroll to top when navigating back
     scrollToTop();
   };
 
@@ -108,21 +129,22 @@ export default function Home() {
       case "repository":
         return {
           title: "Whisper AI Assistant",
-          subtitle: "Connect your repository to get started with AI-powered code analysis",
+          subtitle:
+            "Connect your repository to get started with AI-powered code analysis",
           breadcrumbs: [{ label: "Home", current: true }],
         };
-      
+
       case "task":
         return {
           title: "Choose Analysis Type",
           subtitle: `Analyzing: ${selectedRepository}`,
           breadcrumbs: [
             { label: "Home", href: "/" },
-            { label: "Task Selection", current: true }
+            { label: "Task Selection", current: true },
           ],
           onBack: handleBack,
         };
-      
+
       case "execution":
         return {
           title: selectedTask ? getTaskTitle(selectedTask) : "Running Analysis",
@@ -130,11 +152,11 @@ export default function Home() {
           breadcrumbs: [
             { label: "Home", href: "/" },
             { label: "Task Selection", href: "/task" },
-            { label: "Execution", current: true }
+            { label: "Execution", current: true },
           ],
           onBack: handleBack,
         };
-      
+
       case "smart-execution":
         return {
           title: "Smart Analysis",
@@ -142,11 +164,24 @@ export default function Home() {
           breadcrumbs: [
             { label: "Home", href: "/" },
             { label: "Task Selection", href: "/task" },
-            { label: "Smart Analysis", current: true }
+            { label: "Smart Analysis", current: true },
           ],
           onBack: handleBack,
         };
-      
+
+      case "results":
+        return {
+          title: "Analysis Results",
+          subtitle: `Repository: ${getRepoName(selectedRepository)}`,
+          breadcrumbs: [
+            { label: "Home", href: "/" },
+            { label: "Task Selection", href: "/task" },
+            { label: "Execution", href: "/execution" },
+            { label: "Results", current: true },
+          ],
+          onBack: handleBack,
+        };
+
       default:
         return {
           title: "Whisper AI Assistant",
@@ -156,13 +191,14 @@ export default function Home() {
   };
 
   const getStepIndicatorSteps = () => {
-    return STEPS.map(step => ({
+    return STEPS.map((step) => ({
       ...step,
-      status: currentStep === step.id 
-        ? 'current' as const
-        : getStepIndex(currentStep) > getStepIndex(step.id)
-        ? 'completed' as const
-        : 'upcoming' as const
+      status:
+        currentStep === step.id
+          ? ("current" as const)
+          : getStepIndex(currentStep) > getStepIndex(step.id)
+          ? ("completed" as const)
+          : ("upcoming" as const),
     }));
   };
 
@@ -171,7 +207,8 @@ export default function Home() {
       repository: 0,
       task: 1,
       execution: 2,
-      'smart-execution': 2
+      "smart-execution": 2,
+      results: 3,
     };
     return stepMap[step] || 0;
   };
@@ -184,86 +221,73 @@ export default function Home() {
     return taskTitles[task] || "Analysis";
   };
 
-  const getRepoName = (repo: string) => {
-    if (repo.includes('github.com')) {
-      const match = repo.match(/github\.com\/([^\/]+\/[^\/]+)/);
-      return match ? match[1] : repo;
-    }
-    return repo;
-  };
-
   const renderCurrentStep = () => {
     switch (currentStep) {
       case "repository":
-        return (
-          <div className="animate-in fade-in-0 duration-300">
-            <RepositorySelector onRepoSelect={handleRepositorySelect} />
-          </div>
-        );
-      
+        return <RepositorySelector onRepoSelect={handleRepositorySelect} />;
+
       case "task":
         return (
-          <div className="animate-in fade-in-0 duration-300">
-            <TaskSelector
-              repository={selectedRepository}
-              onTaskSelect={handleTaskSelect}
-              onStartTask={handleStartTask}
-              onStartSmartTask={handleStartSmartTask}
-              selectedTask={selectedTask}
-            />
-          </div>
+          <TaskSelector
+            repository={selectedRepository}
+            onTaskSelect={handleTaskSelect}
+            onStartTask={handleStartTask}
+            onStartSmartTask={handleStartSmartTask}
+            selectedTask={selectedTask}
+          />
         );
-      
+
       case "execution":
         return (
-          <div className="animate-in fade-in-0 duration-300">
-            <TaskExecution
-              repository={selectedRepository}
-              task={selectedTask || "explore-codebase"}
-              onBack={handleBack}
-            />
-          </div>
+          <TaskExecution
+            repository={selectedRepository}
+            task={selectedTask || "explore-codebase"}
+            onBack={handleBack}
+            onComplete={handleTaskComplete}
+          />
         );
-      
+
       case "smart-execution":
         return (
-          <div className="animate-in fade-in-0 duration-300">
-            <SmartTaskExecution
-              repository={selectedRepository}
-              context={smartAnalysisContext}
-              options={smartAnalysisOptions}
-              onBack={handleBack}
-            />
-          </div>
+          <SmartTaskExecution
+            repository={selectedRepository}
+            context={smartAnalysisContext}
+            options={smartAnalysisOptions}
+            onBack={handleBack}
+            onComplete={handleTaskComplete}
+          />
         );
-      
-      default:
+
+      case "results":
         return (
-          <div className="animate-in fade-in-0 duration-300">
-            <RepositorySelector onRepoSelect={handleRepositorySelect} />
-          </div>
+          <Results
+            repository={selectedRepository}
+            taskType={selectedTask || "smart-analysis"}
+            results={analysisResults}
+            onBack={handleBack}
+            onNewAnalysis={handleNewAnalysis}
+          />
         );
+
+      default:
+        return <RepositorySelector onRepoSelect={handleRepositorySelect} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <NavigationHeader {...getNavigationProps()} />
-      
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Step Indicator - shown for non-execution steps */}
-        {currentStep !== "execution" && currentStep !== "smart-execution" && (
+        {
           <div className="mb-8">
-            <div className="max-w-6xl mx-auto">
+            <div className="mx-auto">
               <StepIndicator steps={getStepIndicatorSteps()} />
             </div>
           </div>
-        )}
-        
-        {/* Main Content */}
-        <main className="max-w-6xl mx-auto">
-          {renderCurrentStep()}
-        </main>
+        }
+
+        <main className="mx-auto">{renderCurrentStep()}</main>
       </div>
     </div>
   );

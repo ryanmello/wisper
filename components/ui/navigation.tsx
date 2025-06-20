@@ -8,6 +8,8 @@ interface BreadcrumbItem {
   current?: boolean;
 }
 
+
+
 interface NavigationHeaderProps {
   title: string;
   subtitle?: string;
@@ -30,7 +32,7 @@ export function NavigationHeader({
   progress,
 }: NavigationHeaderProps) {
   return (
-    <div className="border-b bg-card/50 backdrop-blur-sm">
+    <div className="border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex items-center justify-between py-2">
           <div className="flex items-center space-x-4">
@@ -45,12 +47,12 @@ export function NavigationHeader({
                 Back
               </Button>
             )}
-            
+
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-black to-gray-800 rounded-lg flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-gray-800 rounded-lg flex items-center justify-center shadow-lg">
                 <span className="text-white font-bold text-sm">W</span>
               </div>
-              
+
               <div className="min-w-0 flex-1">
                 <div className="flex items-center space-x-2">
                   <h1 className="text-xl font-bold text-foreground">{title}</h1>
@@ -61,16 +63,20 @@ export function NavigationHeader({
                     </Badge>
                   )}
                 </div>
-                
+
                 {subtitle && (
-                  <p className="text-muted-foreground text-sm mt-1">{subtitle}</p>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    {subtitle}
+                  </p>
                 )}
-                
+
                 {breadcrumbs && breadcrumbs.length > 0 && (
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     {breadcrumbs.map((item, index) => (
                       <span key={index} className="flex items-center">
-                        {index > 0 && <span className="mx-2 text-border">/</span>}
+                        {index > 0 && (
+                          <span className="mx-2 text-border">/</span>
+                        )}
                         <span
                           className={
                             item.current
@@ -98,19 +104,19 @@ export function NavigationHeader({
               </div>
             </div>
           </div>
-          
+
           {actions && (
-            <div className="flex items-center space-x-2">
-              {actions}
-            </div>
+            <div className="flex items-center space-x-2">{actions}</div>
           )}
         </div>
-        
+
         {progress && (
           <div className="pb-3">
             <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
               <span>Progress</span>
-              <span>{Math.round((progress.current / progress.total) * 100)}%</span>
+              <span>
+                {Math.round((progress.current / progress.total) * 100)}%
+              </span>
             </div>
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div
@@ -132,7 +138,7 @@ interface StepIndicatorProps {
     id: string;
     label: string;
     description?: string;
-    status: 'completed' | 'current' | 'upcoming';
+    status: "completed" | "current" | "upcoming";
   }[];
 }
 
@@ -146,16 +152,20 @@ export function StepIndicator({ steps }: StepIndicatorProps) {
               className={`
                 w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 transition-colors
                 ${
-                  step.status === 'completed'
-                    ? 'bg-primary border-primary text-primary-foreground'
-                    : step.status === 'current'
-                    ? 'bg-background border-primary text-primary'
-                    : 'bg-background border-muted text-muted-foreground'
+                  step.status === "completed"
+                    ? "bg-primary border-primary text-primary-foreground"
+                    : step.status === "current"
+                    ? "bg-background border-primary text-primary"
+                    : "bg-background border-muted text-muted-foreground"
                 }
               `}
             >
-              {step.status === 'completed' ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              {step.status === "completed" ? (
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
                   <path
                     fillRule="evenodd"
                     d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -166,15 +176,15 @@ export function StepIndicator({ steps }: StepIndicatorProps) {
                 index + 1
               )}
             </div>
-            
+
             <div className="mt-2 text-center">
               <div
                 className={`text-sm font-medium ${
-                  step.status === 'current'
-                    ? 'text-foreground'
-                    : step.status === 'completed'
-                    ? 'text-primary'
-                    : 'text-muted-foreground'
+                  step.status === "current"
+                    ? "text-foreground"
+                    : step.status === "completed"
+                    ? "text-primary"
+                    : "text-muted-foreground"
                 }`}
               >
                 {step.label}
@@ -186,13 +196,14 @@ export function StepIndicator({ steps }: StepIndicatorProps) {
               )}
             </div>
           </div>
-          
+
           {index < steps.length - 1 && (
             <div
               className={`flex-1 h-0.5 mx-4 ${
-                steps[index + 1].status === 'completed' || step.status === 'completed'
-                  ? 'bg-primary'
-                  : 'bg-border'
+                steps[index + 1].status === "completed" ||
+                step.status === "completed"
+                  ? "bg-primary"
+                  : "bg-border"
               }`}
             />
           )}
@@ -207,7 +218,7 @@ interface QuickActionsProps {
     label: string;
     icon?: React.ReactNode;
     onClick: () => void;
-    variant?: 'default' | 'secondary' | 'outline';
+    variant?: "default" | "secondary" | "outline";
   }[];
 }
 
@@ -217,7 +228,7 @@ export function QuickActions({ actions }: QuickActionsProps) {
       {actions.map((action, index) => (
         <Button
           key={index}
-          variant={action.variant || 'outline'}
+          variant={action.variant || "outline"}
           size="sm"
           onClick={action.onClick}
           className="flex items-center space-x-1"
@@ -228,4 +239,4 @@ export function QuickActions({ actions }: QuickActionsProps) {
       ))}
     </div>
   );
-} 
+}

@@ -19,20 +19,21 @@ interface SmartTaskExecutionProps {
   context: string;
   options?: any;
   onBack: () => void;
+  onComplete?: (results: SmartAnalysisResults) => void;
 }
 
 export default function SmartTaskExecution({ 
   repository, 
   context, 
   options = {},
-  onBack 
+  onBack,
+  onComplete
 }: SmartTaskExecutionProps) {
   const [currentStep, setCurrentStep] = useState<string>("Initializing smart analysis...");
   const [isCompleted, setIsCompleted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(true);
-  const [results, setResults] = useState<SmartAnalysisResults | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [executionPlan, setExecutionPlan] = useState<ExecutionPlanType | null>(null);
   
@@ -41,6 +42,7 @@ export default function SmartTaskExecution({
   const [completedTools, setCompletedTools] = useState<Set<string>>(new Set());
   const [failedTools, setFailedTools] = useState<Set<string>>(new Set());
   const [runningTools, setRunningTools] = useState<Set<string>>(new Set());
+  const [startTime, setStartTime] = useState<Date | null>(null);
   
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -84,6 +86,9 @@ export default function SmartTaskExecution({
                   setProgress(data.progress);
                 }
                 setIsConnecting(false);
+                if (!startTime) {
+                  setStartTime(new Date());
+                }
                 break;
 
               case 'execution_plan':
@@ -92,6 +97,9 @@ export default function SmartTaskExecution({
                   setCurrentStep("Execution plan created - starting tool execution...");
                 }
                 setIsConnecting(false);
+                if (!startTime) {
+                  setStartTime(new Date());
+                }
                 break;
 
               case 'tool_completed':
@@ -139,9 +147,13 @@ export default function SmartTaskExecution({
               case 'completed':
                 setIsCompleted(true);
                 setProgress(100);
-                setCurrentStep("🎉 Smart analysis complete!");
+                setCurrentStep("🎉 Smart analysis complete! Redirecting to results...");
                 if (data.results) {
-                  setResults(data.results);
+                  // Call onComplete immediately
+                  if (onComplete && data.results) {
+                    // Navigate to results immediately
+                    onComplete(data.results!);
+                  }
                 }
                 setRunningTools(new Set());
                 // Set current batch to beyond all batches to show AI processing as complete
@@ -198,13 +210,13 @@ export default function SmartTaskExecution({
     setProgress(0);
     setCurrentStep("Initializing smart analysis...");
     setIsConnecting(true);
-    setResults(null);
     setTaskId(null);
     setExecutionPlan(null);
     setCurrentBatch(0);
     setCompletedTools(new Set());
     setFailedTools(new Set());
     setRunningTools(new Set());
+    setStartTime(null);
   };
 
   const handleCancel = () => {
@@ -216,31 +228,31 @@ export default function SmartTaskExecution({
   const repoName = extractRepoName(repository);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-6">
             <Button 
               variant="ghost" 
               onClick={onBack}
-              className="p-2"
+              className="p-2 hover:bg-white/60 rounded-lg transition-colors"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Button>
-            <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">W</span>
+            <div className="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-lg">W</span>
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
                 🧠 Smart Analysis
               </h1>
-              <p className="text-gray-600">
-                Analyzing <strong>{repoName}</strong> with AI-powered tool selection
+              <p className="text-gray-600 text-lg">
+                Analyzing <span className="font-semibold text-gray-800">{repoName}</span> with AI-powered tool selection
               </p>
               {taskId && (
-                <p className="text-xs text-gray-500 font-mono">
+                <p className="text-xs text-gray-500 font-mono mt-1">
                   Task ID: {taskId}
                 </p>
               )}
@@ -249,19 +261,32 @@ export default function SmartTaskExecution({
         </div>
 
         {/* Context Display */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg">Analysis Context</CardTitle>
+        <Card className="mb-6 shadow-lg border-0 bg-white">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              </div>
+              Analysis Context
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <p className="text-gray-700 bg-gray-50 p-3 rounded-lg italic">
-              "{context}"
-            </p>
+          <CardContent className="pt-0">
+            <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200">
+              <p className="text-gray-800 italic font-medium leading-relaxed">
+                "{context}"
+              </p>
+            </div>
             {options.scope && (
-              <div className="mt-3 flex gap-2">
-                <Badge variant="outline">Scope: {options.scope.replace('_', ' ')}</Badge>
+              <div className="mt-4 flex gap-3">
+                <Badge variant="outline" className="px-3 py-1 bg-blue-50 text-blue-700 border-blue-200">
+                  Scope: {options.scope.replace('_', ' ')}
+                </Badge>
                 {options.depth && (
-                  <Badge variant="outline">Depth: {options.depth}</Badge>
+                  <Badge variant="outline" className="px-3 py-1 bg-purple-50 text-purple-700 border-purple-200">
+                    Depth: {options.depth}
+                  </Badge>
                 )}
               </div>
             )}
@@ -269,12 +294,14 @@ export default function SmartTaskExecution({
         </Card>
 
         {error ? (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="shadow-lg border-0 bg-red-50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-800">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
+              <CardTitle className="flex items-center gap-3 text-red-800">
+                <div className="p-2 bg-red-500 rounded-lg shadow-md">
+                  <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
                 Smart Analysis Failed
               </CardTitle>
               <CardDescription className="text-red-700">
@@ -282,7 +309,7 @@ export default function SmartTaskExecution({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button onClick={handleRetry} variant="outline" size="sm">
                   Try Again
                 </Button>
@@ -293,13 +320,15 @@ export default function SmartTaskExecution({
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Current Progress */}
-            <Card>
-              <CardHeader>
+            <Card className="shadow-lg border-0 bg-white">
+              <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">⚡</span>
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 bg-yellow-100 rounded-lg">
+                      <span className="text-2xl">⚡</span>
+                    </div>
                     Current Status
                   </CardTitle>
                   {!isCompleted && !error && (
@@ -309,32 +338,33 @@ export default function SmartTaskExecution({
                   )}
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    {isConnecting ? (
-                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                    ) : isCompleted ? (
-                      <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <CardContent className="pt-0">
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
+                      isConnecting ? 'bg-blue-500' :
+                      isCompleted ? 'bg-green-500' : 'bg-blue-500'
+                    }`}>
+                      {isConnecting ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : isCompleted ? (
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
-                      </div>
-                    ) : (
-                      <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                    )}
-                    <span className="font-medium">{currentStep}</span>
+                      ) : (
+                        <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      )}
+                    </div>
+                    <span className="font-medium text-lg text-gray-900">{currentStep}</span>
                   </div>
                   
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-blue-600 h-3 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-sm text-gray-600">
+                  <div className="flex justify-between text-sm text-gray-600 font-medium">
                     <span>Progress: {progress}%</span>
                     <span>{isCompleted ? "Complete" : "In Progress"}</span>
                   </div>
@@ -353,202 +383,7 @@ export default function SmartTaskExecution({
               />
             )}
 
-            {/* Results */}
-            {isCompleted && results && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="text-2xl">📊</span>
-                    Analysis Results
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* AI Summary */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">AI-Generated Summary</h3>
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-gray-700 whitespace-pre-wrap">{results.summary}</p>
-                      </div>
-                    </div>
 
-                    {/* Key Metrics */}
-                    {Object.keys(results.metrics).length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">Key Metrics</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {Object.entries(results.metrics).map(([key, value]) => (
-                            <div key={key} className="bg-gray-50 p-3 rounded-lg">
-                              <div className="text-2xl font-bold text-blue-600">{value}</div>
-                              <div className="text-xs text-gray-600">{key.replace(/_/g, ' ')}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Vulnerability Summary */}
-                    {results.vulnerability_summary && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">Security Overview</h3>
-                        <div className="bg-red-50 p-4 rounded-lg">
-                          <div className="flex items-center gap-4 mb-3">
-                            <Badge className={`
-                              ${results.vulnerability_summary.risk_level === 'CRITICAL' ? 'bg-red-600' :
-                                results.vulnerability_summary.risk_level === 'HIGH' ? 'bg-orange-600' :
-                                results.vulnerability_summary.risk_level === 'MEDIUM' ? 'bg-yellow-600' :
-                                'bg-green-600'}
-                            `}>
-                              {results.vulnerability_summary.risk_level} RISK
-                            </Badge>
-                            <span className="text-sm text-gray-600">
-                              {results.vulnerability_summary.total_vulnerabilities} vulnerabilities found
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-red-600">
-                                {results.vulnerability_summary.critical_vulnerabilities}
-                              </div>
-                              <div className="text-xs text-gray-600">Critical</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-orange-600">
-                                {results.vulnerability_summary.high_vulnerabilities}
-                              </div>
-                              <div className="text-xs text-gray-600">High</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-yellow-600">
-                                {results.vulnerability_summary.medium_vulnerabilities}
-                              </div>
-                              <div className="text-xs text-gray-600">Medium</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-lg font-bold text-green-600">
-                                {results.vulnerability_summary.low_vulnerabilities}
-                              </div>
-                              <div className="text-xs text-gray-600">Low</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Recommendations */}
-                    {results.recommendations.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">Recommendations</h3>
-                        <div className="space-y-2">
-                          {results.recommendations.slice(0, 10).map((rec, index) => (
-                            <div key={index} className="flex items-start gap-2">
-                              <span className="text-blue-500 mt-1">•</span>
-                              <span className="text-gray-700">{rec}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tool Results Summary */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">Tool Execution Summary</h3>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          <div>
-                            <div className="text-lg font-bold text-green-600">{completedTools.size}</div>
-                            <div className="text-xs text-gray-600">Tools Completed</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold text-red-600">{failedTools.size}</div>
-                            <div className="text-xs text-gray-600">Tools Failed</div>
-                          </div>
-                          <div>
-                            <div className="text-lg font-bold text-blue-600">
-                              {results.execution_info.execution_plan?.estimated_total_time || "N/A"}
-                            </div>
-                            <div className="text-xs text-gray-600">Total Time</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Individual Tool Results */}
-                    {results.tool_results && Object.keys(results.tool_results).length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">Detailed Tool Results</h3>
-                        <div className="space-y-4">
-                          {Object.entries(results.tool_results).map(([toolName, toolResult]: [string, any]) => (
-                            <Card key={toolName} className="border-l-4 border-l-blue-500">
-                              <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                  <CardTitle className="text-base flex items-center gap-2">
-                                    <span className="text-lg">
-                                      {toolName.includes('vulnerability') ? '🔍' : 
-                                       toolName.includes('explorer') ? '📁' : 
-                                       toolName.includes('performance') ? '⚡' : 
-                                       toolName.includes('security') ? '🔒' : '🔧'}
-                                    </span>
-                                    {toolName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                  </CardTitle>
-                                  <Badge variant={toolResult.success ? "default" : "destructive"}>
-                                    {toolResult.success ? "✅ Success" : "❌ Failed"}
-                                  </Badge>
-                                </div>
-                                {toolResult.execution_time && (
-                                  <p className="text-sm text-muted-foreground">
-                                    Execution time: {toolResult.execution_time.toFixed(2)}s
-                                  </p>
-                                )}
-                              </CardHeader>
-                              <CardContent>
-                                {toolResult.success && toolResult.results ? (
-                                  <div className="space-y-3">
-                                    {/* Display tool results in a formatted way */}
-                                    {typeof toolResult.results === 'object' ? (
-                                      <div className="space-y-2">
-                                        {Object.entries(toolResult.results).map(([key, value]: [string, any]) => (
-                                          <div key={key} className="border-l-2 border-gray-200 pl-3">
-                                            <div className="text-sm font-medium text-gray-700 capitalize">
-                                              {key.replace(/_/g, ' ')}
-                                            </div>
-                                            <div className="text-sm text-gray-600 mt-1">
-                                              {typeof value === 'object' ? (
-                                                <pre className="bg-gray-50 p-2 rounded text-xs overflow-x-auto">
-                                                  {JSON.stringify(value, null, 2)}
-                                                </pre>
-                                              ) : (
-                                                <span>{String(value)}</span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <div className="bg-gray-50 p-3 rounded-lg">
-                                        <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                                          {String(toolResult.results)}
-                                        </pre>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <div className="bg-red-50 p-3 rounded-lg">
-                                    <p className="text-red-700 text-sm">
-                                      {toolResult.errors ? toolResult.errors.join(', ') : 'Tool execution failed'}
-                                    </p>
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
         )}
       </div>

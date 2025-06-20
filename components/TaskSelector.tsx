@@ -188,7 +188,6 @@ export default function TaskSelector({
         setToolsInfo(info);
         setError(null); // Clear any previous errors
       } catch (error) {
-        console.log('Tools registry not available:', error);
         setError('Unable to load analysis tools. Some features may be limited.');
       }
     };
@@ -714,7 +713,7 @@ export default function TaskSelector({
               onClick={handleSmartSubmit}
               disabled={!context.trim() || isAnalyzing}
               size="lg"
-              className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isAnalyzing ? (
                 <>
@@ -804,7 +803,7 @@ export default function TaskSelector({
               onClick={onStartTask} 
               disabled={!selectedTask}
               size="lg"
-              className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="w-4 h-4 mr-2" />
               Start Analysis
