@@ -7,6 +7,7 @@ import logging
 from agents.codebase_exploration_agent import CodebaseExplorationAgent
 from agents.dependency_audit_agent import DependencyAuditAgent
 from agents.smart_analysis_agent import SmartAnalysisAgent
+from agents.smart_agent import SmartAgent  # New AI-driven agent
 from core.tool_registry import get_tool_registry, initialize_tool_registry
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,8 @@ class AnalysisService:
     
     def __init__(self, openai_api_key: str):
         self.openai_api_key = openai_api_key
-        self.smart_agent = SmartAnalysisAgent(openai_api_key=openai_api_key)
+        self.smart_agent = SmartAnalysisAgent(openai_api_key=openai_api_key)  # Legacy agent
+        self.ai_smart_agent = SmartAgent(openai_api_key=openai_api_key)  # New AI-driven agent
         
         self.active_connections: Dict[str, WebSocket] = {}
         self.active_tasks: Dict[str, asyncio.Task] = {}
@@ -62,6 +64,20 @@ class AnalysisService:
         task_id = str(uuid.uuid4())
         logger.info(f"Created smart analysis task {task_id} for repository: {repository_url}")
         logger.info(f"Context: {context[:100]}...")
+        return task_id
+    
+    async def create_ai_task(self, repository_url: str, prompt: str) -> str:
+        """Create a new AI-driven analysis task using simplified request (just prompt!)."""
+        task_id = str(uuid.uuid4())
+        
+        self.task_metadata[task_id] = {
+            "repository_url": repository_url,
+            "prompt": prompt,
+            "task_type": "ai_analysis"
+        }
+        
+        logger.info(f"Created AI analysis task {task_id} for repository: {repository_url}")
+        logger.info(f"User prompt: {prompt[:100]}...")
         return task_id
     
     async def connect_websocket(self, task_id: str, websocket: WebSocket):
@@ -124,7 +140,7 @@ class AnalysisService:
         await self.initialize()
         
         try:
-            await self._run_smart_analysis(
+            await self._run_ai_smart_analysis(
                 task_id, repository_url, context, intent, target_languages, 
                 scope, depth, additional_params
             )
@@ -133,6 +149,20 @@ class AnalysisService:
             raise
         except Exception as e:
             logger.error(f"Smart analysis task {task_id} failed: {e}")
+            raise
+    
+    async def start_ai_analysis(self, task_id: str, repository_url: str, prompt: str):
+        """Start simplified AI-driven analysis with just a prompt."""
+        
+        await self.initialize()
+        
+        try:
+            await self._run_simple_ai_analysis(task_id, repository_url, prompt)
+        except asyncio.CancelledError:
+            logger.info(f"AI analysis task {task_id} was cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"AI analysis task {task_id} failed: {e}")
             raise
     
     async def _run_analysis(
@@ -265,7 +295,7 @@ class AnalysisService:
         depth: str = "comprehensive",
         additional_params: Optional[Dict] = None
     ):
-        """Internal method to run smart analysis using SmartAnalysisAgent."""
+        """Legacy method to run smart analysis using SmartAnalysisAgent."""
         try:
             # Send initial confirmation
             await self.send_message(task_id, {
@@ -310,6 +340,88 @@ class AnalysisService:
                 "type": "task.error",
                 "task_id": task_id,
                 "error": f"Smart analysis failed: {str(e)}"
+            })
+    
+    async def _run_ai_smart_analysis(
+        self,
+        task_id: str,
+        repository_url: str, 
+        context: str,
+        intent: Optional[str] = None,
+        target_languages: Optional[list] = None,
+        scope: str = "full",
+        depth: str = "comprehensive",
+        additional_params: Optional[Dict] = None
+    ):
+        """New method to run AI-driven smart analysis using SmartAgent with tool orchestration."""
+        try:
+            # Send initial confirmation
+            await self.send_message(task_id, {
+                "type": "ai_smart_task.started",
+                "task_id": task_id,
+                "status": "running",
+                "repository_url": repository_url,
+                "context": context,
+                "intent": intent,
+                "scope": scope,
+                "depth": depth,
+                "analysis_mode": "ai_orchestrated"
+            })
+            
+            # Run AI-driven smart analysis with real-time updates
+            async for update in self.ai_smart_agent.analyze_repository(repository_url, context):
+                # Forward all updates to the client with task_id
+                update["task_id"] = task_id
+                await self.send_message(task_id, update)
+                
+                # Break on completion or error
+                if update["type"] in ["completed", "error"]:
+                    break
+        
+        except Exception as e:
+            logger.error(f"AI-driven smart analysis failed for task {task_id}: {e}")
+            await self.send_message(task_id, {
+                "type": "task.error",
+                "task_id": task_id,
+                "error": f"AI-driven smart analysis failed: {str(e)}",
+                "context": "ai_smart_analysis"
+            })
+    
+    async def _run_simple_ai_analysis(self, task_id: str, repository_url: str, prompt: str):
+        """Run simplified AI-driven analysis using just a user prompt."""
+        try:
+            # Send initial confirmation with simplified format
+            await self.send_message(task_id, {
+                "type": "ai_analysis.started",
+                "task_id": task_id,
+                "status": "running",
+                "repository_url": repository_url,
+                "prompt": prompt,
+                "message": "AI is analyzing your repository based on your prompt..."
+            })
+            
+            logger.info(f"Starting simplified AI analysis for task {task_id}")
+            logger.info(f"Repository: {repository_url}")
+            logger.info(f"User prompt: {prompt}")
+            
+            # Run AI-driven analysis with the prompt as context
+            async for update in self.ai_smart_agent.analyze_repository(repository_url, prompt):
+                # Forward all updates to the client with task_id
+                update["task_id"] = task_id
+                await self.send_message(task_id, update)
+                
+                # Break on completion or error
+                if update["type"] in ["completed", "error"]:
+                    logger.info(f"AI analysis task {task_id} finished with type: {update['type']}")
+                    break
+        
+        except Exception as e:
+            logger.error(f"Simplified AI analysis failed for task {task_id}: {e}")
+            await self.send_message(task_id, {
+                "type": "task.error",
+                "task_id": task_id,
+                "error": f"AI analysis failed: {str(e)}",
+                "context": "simple_ai_analysis"
             })
     
     def _generate_summary(self, results: Dict[str, Any]) -> str:

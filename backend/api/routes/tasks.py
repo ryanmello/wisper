@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from models.api_models import (
     AnalysisRequest, AnalysisResponse, SmartAnalysisRequest, SmartAnalysisResponse,
+    AIAnalysisRequest, AIAnalysisResponse,
     TaskStatus, ActiveConnectionsInfo, ToolRegistryInfo, IntentAnalysisRequest, AIAnalysis,
     GitHubServiceStatus
 )
@@ -123,7 +124,7 @@ async def create_analysis_task(request: AnalysisRequest):
 
 @router.post("/smart-tasks/", response_model=SmartAnalysisResponse)
 async def create_smart_analysis_task(request: SmartAnalysisRequest):
-    """Create a new smart context-based analysis task."""
+    """Create a new smart context-based analysis task (legacy)."""
     analysis_service = get_analysis_service()
     if analysis_service is None:
         raise HTTPException(status_code=503, detail="Analysis service not available")
@@ -148,6 +149,69 @@ async def create_smart_analysis_task(request: SmartAnalysisRequest):
         websocket_url=websocket_url,
         analysis_plan=None  # Will be populated during execution
     )
+
+@router.post("/ai-tasks/", response_model=AIAnalysisResponse)
+async def create_ai_analysis_task(request: AIAnalysisRequest):
+    """Create a new AI-driven analysis task using intelligent tool orchestration.
+    
+    Simply provide a repository URL and describe what you want to analyze in natural language!
+    The AI will automatically:
+    - Infer intent from your prompt
+    - Detect languages and frameworks 
+    - Determine appropriate analysis scope and depth
+    - Select and orchestrate the right tools
+    
+    Example prompts:
+    - "scan for security vulnerabilities"
+    - "analyze the architecture and suggest improvements"  
+    - "check code quality and find refactoring opportunities"
+    - "find performance bottlenecks"
+    """
+    analysis_service = get_analysis_service()
+    if analysis_service is None:
+        raise HTTPException(status_code=503, detail="Analysis service not available")
+    
+    # Create AI-driven task using just the prompt (much simpler!)
+    task_id = await analysis_service.create_ai_task(
+        repository_url=request.repository_url,
+        prompt=request.prompt
+    )
+    
+    # Construct WebSocket URL for AI-driven analysis
+    websocket_url = f"ws://{settings.HOST}:{settings.PORT}/ws/ai-tasks/{task_id}"
+    
+    return AIAnalysisResponse(
+        task_id=task_id,
+        status="created",
+        websocket_url=websocket_url,
+        message=f"AI analysis task created! The AI will analyze '{request.repository_url}' based on your prompt."
+    )
+
+@router.post("/ai-tasks/mock", response_model=AIAnalysisResponse)
+async def create_mock_ai_task(request: AIAnalysisRequest):
+    """Create a mock AI task that returns fake results without using OpenAI API."""
+    
+    try:
+        analysis_service = get_analysis_service()
+        if analysis_service is None:
+            raise HTTPException(status_code=503, detail="Analysis service not available")
+        
+        await analysis_service.initialize()
+        
+        task_id = await analysis_service.create_ai_task(request.repository_url, request.prompt)
+        
+        websocket_url = f"ws://localhost:8000/ws/ai-tasks-mock/{task_id}"
+        
+        return AIAnalysisResponse(
+            task_id=task_id,
+            status="created",
+            websocket_url=websocket_url,
+            message="Mock AI analysis task created successfully - no OpenAI API usage"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to create mock AI task: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create mock AI task: {str(e)}")
 
 @router.get("/tasks/{task_id}", response_model=TaskStatus)
 async def get_task_status(task_id: str):

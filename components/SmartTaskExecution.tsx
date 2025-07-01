@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { 
   WhisperAPI, 
-  SmartAnalysisRequest, 
-  SmartAnalysisProgress, 
+  AIAnalysisRequest, 
+  AIAnalysisProgress, 
   SmartAnalysisResults,
   ExecutionPlan as ExecutionPlanType,
   extractRepoName 
@@ -17,7 +17,6 @@ import ExecutionPlan from "./ExecutionPlan";
 interface SmartTaskExecutionProps {
   repository: string;
   context: string;
-  options?: any;
   onBack: () => void;
   onComplete?: (results: SmartAnalysisResults) => void;
 }
@@ -25,11 +24,10 @@ interface SmartTaskExecutionProps {
 export default function SmartTaskExecution({ 
   repository, 
   context, 
-  options = {},
   onBack,
   onComplete
 }: SmartTaskExecutionProps) {
-  const [currentStep, setCurrentStep] = useState<string>("Initializing smart analysis...");
+  const [currentStep, setCurrentStep] = useState<string>("Initializing AI analysis...");
   const [isCompleted, setIsCompleted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -54,30 +52,37 @@ export default function SmartTaskExecution({
         setIsConnecting(true);
         setError(null);
 
-        // Create smart analysis request
-        const request: SmartAnalysisRequest = {
+        // Create AI analysis request (simplified!)
+        const request: AIAnalysisRequest = {
           repository_url: repository,
-          context: context,
-          ...options
+          prompt: context  // Use context as the prompt
         };
 
-        const taskResponse = await WhisperAPI.createSmartTask(request);
+        const taskResponse = await WhisperAPI.createAITask(request);
         
         if (!mounted) return;
         
         setTaskId(taskResponse.task_id);
-        setCurrentStep("Connecting to smart analysis service...");
+        setCurrentStep("Connecting to AI analysis service...");
 
-        // Connect to smart WebSocket
-        const ws = WhisperAPI.connectSmartWebSocket(
+        // Connect to AI WebSocket
+        const ws = WhisperAPI.connectAIWebSocket(
           taskResponse.websocket_url,
           taskResponse.task_id,
           request,
-          (data: SmartAnalysisProgress) => {
+          (data: AIAnalysisProgress) => {
             if (!mounted) return;
 
 
             switch (data.type) {
+              case 'ai_analysis.started':
+                setCurrentStep(data.message || "🤖 AI analysis started - analyzing your prompt...");
+                setIsConnecting(false);
+                if (!startTime) {
+                  setStartTime(new Date());
+                }
+                break;
+
               case 'progress':
                 if (data.current_step) {
                   setCurrentStep(data.current_step);
@@ -144,10 +149,22 @@ export default function SmartTaskExecution({
                 }
                 break;
 
+              case 'tool_error':
+                if (data.tool_name) {
+                  setFailedTools(prev => new Set([...prev, data.tool_name!]));
+                  setRunningTools(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(data.tool_name!);
+                    return newSet;
+                  });
+                  setCurrentStep(`❌ ${data.tool_name} failed: ${data.error || 'Unknown error'}`);
+                }
+                break;
+
               case 'completed':
                 setIsCompleted(true);
                 setProgress(100);
-                setCurrentStep("🎉 Smart analysis complete! Redirecting to results...");
+                setCurrentStep("🎉 AI analysis complete! Redirecting to results...");
                 if (data.results) {
                   // Call onComplete immediately
                   if (onComplete && data.results) {
@@ -162,7 +179,7 @@ export default function SmartTaskExecution({
                 break;
 
               case 'error':
-                setError(data.error || "An unknown error occurred during smart analysis");
+                setError(data.error || "An unknown error occurred during AI analysis");
                 setIsConnecting(false);
                 setRunningTools(new Set());
                 break;
@@ -171,7 +188,7 @@ export default function SmartTaskExecution({
           (error: Event) => {
             if (!mounted) return;
             console.error('Smart WebSocket error:', error);
-            setError("Connection error occurred during smart analysis");
+            setError("Connection error occurred during AI analysis");
             setIsConnecting(false);
           },
           (event: CloseEvent) => {
@@ -187,8 +204,8 @@ export default function SmartTaskExecution({
 
       } catch (err) {
         if (!mounted) return;
-        console.error('Error starting smart analysis:', err);
-        setError(err instanceof Error ? err.message : "Failed to start smart analysis");
+        console.error('Error starting AI analysis:', err);
+        setError(err instanceof Error ? err.message : "Failed to start AI analysis");
         setIsConnecting(false);
       }
     };
@@ -202,13 +219,13 @@ export default function SmartTaskExecution({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repository, context, options]);
+  }, [repository, context]);
 
   const handleRetry = () => {
     setError(null);
     setIsCompleted(false);
     setProgress(0);
-    setCurrentStep("Initializing smart analysis...");
+    setCurrentStep("Initializing AI analysis...");
     setIsConnecting(true);
     setTaskId(null);
     setExecutionPlan(null);
@@ -246,7 +263,7 @@ export default function SmartTaskExecution({
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                🧠 Smart Analysis
+                🤖 AI Analysis
               </h1>
               <p className="text-gray-600 text-lg">
                 Analyzing <span className="font-semibold text-gray-800">{repoName}</span> with AI-powered tool selection
@@ -278,18 +295,12 @@ export default function SmartTaskExecution({
                 "{context}"
               </p>
             </div>
-            {options.scope && (
-              <div className="mt-4 flex gap-3">
-                <Badge variant="outline" className="px-3 py-1 bg-blue-50 text-blue-700 border-blue-200">
-                  Scope: {options.scope.replace('_', ' ')}
-                </Badge>
-                {options.depth && (
-                  <Badge variant="outline" className="px-3 py-1 bg-purple-50 text-purple-700 border-purple-200">
-                    Depth: {options.depth}
-                  </Badge>
-                )}
+            <div className="mt-4">
+              <div className="inline-flex items-center px-3 py-1 bg-gradient-to-r from-green-100 to-blue-100 text-green-800 border border-green-200 rounded-full text-sm font-medium">
+                <span className="mr-2">🤖</span>
+                AI will automatically determine scope, depth, and approach
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
 
@@ -302,7 +313,7 @@ export default function SmartTaskExecution({
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
-                Smart Analysis Failed
+                AI Analysis Failed
               </CardTitle>
               <CardDescription className="text-red-700">
                 {error}

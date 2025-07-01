@@ -12,15 +12,11 @@ interface TaskSelectorProps {
   repository: string;
   onTaskSelect: (task: TaskType | null) => void;
   onStartTask: () => void;
-  onStartSmartTask: (context: string, options?: any) => void;
+  onStartSmartTask: (context: string) => void; // Simplified for AI analysis
   selectedTask: TaskType | null;
 }
 
-interface SmartAnalysisOptions {
-  scope?: 'full' | 'security_focused' | 'performance_focused';
-  depth?: 'surface' | 'deep' | 'comprehensive';
-  target_languages?: string[];
-}
+
 
 interface DetectedIntent {
   type: string;
@@ -163,12 +159,8 @@ export default function TaskSelector({
   const [error, setError] = useState<string | null>(null);
   const [context, setContext] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [options, setOptions] = useState<SmartAnalysisOptions>({
-    scope: 'full',
-    depth: 'comprehensive',
-    target_languages: []
-  });
+
+
   const [aiAnalysis, setAIAnalysis] = useState<AIAnalysis | null>(null);
   const [isAnalyzingIntent, setIsAnalyzingIntent] = useState(false);
 
@@ -212,12 +204,8 @@ export default function TaskSelector({
       setAIAnalysis(analysis);
       
       if (analysis && analysis.intents.length > 0) {
-        const primaryIntent = analysis.intents[0];
-        setOptions(prev => ({ 
-          ...prev, 
-          scope: primaryIntent.suggestedScope,
-          depth: analysis.complexity === 'complex' ? 'comprehensive' : 'deep'
-        }));
+        // AI will handle the analysis automatically when submitted
+        setError(null);
       } else {
         setError('AI analysis could not detect clear intent. Try being more specific about your goals.');
       }
@@ -316,7 +304,7 @@ export default function TaskSelector({
     
     setError(null);
     setIsAnalyzing(true);
-    onStartSmartTask(context, options);
+    onStartSmartTask(context); // Simplified - AI handles everything!
   };
 
   const handleCustomInput = (value: string) => {
@@ -329,7 +317,6 @@ export default function TaskSelector({
     setContext("");
     setSelectedSuggestion(null);
     setIsAnalyzing(false);
-    setShowAdvanced(false);
     setError(null);
   };
 
@@ -608,85 +595,35 @@ export default function TaskSelector({
             </CardContent>
           </Card>
 
-          {/* Advanced Options */}
+          {/* AI Analysis Info */}
           <Card className="shadow-sm">
             <CardHeader>
-              <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Settings2 className="w-5 h-5 text-primary" />
+                <Brain className="w-5 h-5 text-primary" />
                   <div>
-                    <CardTitle className="text-lg">Advanced Configuration</CardTitle>
-                    <CardDescription>Fine-tune analysis parameters for optimal results</CardDescription>
-                  </div>
+                  <CardTitle className="text-lg">AI-Powered Analysis</CardTitle>
+                  <CardDescription>Our AI will handle all configuration automatically</CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  disabled={isAnalyzing}
-                  className="hover:bg-muted/50"
-                >
-                  {showAdvanced ? "Hide" : "Show"} Options
-                </Button>
               </div>
             </CardHeader>
             
-            {showAdvanced && (
-              <CardContent className="space-y-6">
-                {/* Scope Selection */}
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🤖</span>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Analysis Scope
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(['full', 'security_focused', 'performance_focused'] as const).map((scope) => (
-                      <Button
-                        key={scope}
-                        variant={options.scope === scope ? "default" : "outline"}
-                        onClick={() => setOptions(prev => ({ ...prev, scope }))}
-                        disabled={isAnalyzing}
-                        className="h-auto p-4 flex-col space-y-1"
-                      >
-                        <span className="font-medium">
-                          {scope === 'full' ? 'Comprehensive' : 
-                           scope === 'security_focused' ? 'Security Focus' : 'Performance Focus'}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {scope === 'full' ? 'Complete analysis' : 
-                           scope === 'security_focused' ? 'Security-first approach' : 'Performance optimization'}
-                        </span>
-                      </Button>
-                    ))}
+                    <h4 className="font-medium text-blue-900">AI-Powered Analysis</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Our AI will automatically determine the optimal scope, depth, and tools based on your description.
+                    </p>
                   </div>
-                </div>
-
-                {/* Depth Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-3">
-                    Analysis Depth
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {(['surface', 'deep', 'comprehensive'] as const).map((depth) => (
-                      <Button
-                        key={depth}
-                        variant={options.depth === depth ? "default" : "outline"}
-                        onClick={() => setOptions(prev => ({ ...prev, depth }))}
-                        disabled={isAnalyzing}
-                        className="h-auto p-4 flex-col space-y-1"
-                      >
-                        <span className="font-medium capitalize">{depth}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {depth === 'surface' ? 'Quick overview' : 
-                           depth === 'deep' ? 'Detailed analysis' : 'Exhaustive review'}
-                        </span>
-                      </Button>
-                    ))}
                   </div>
                 </div>
 
                 {/* Available Tools Info */}
                 {toolsInfo && (
                   <div className="p-4 bg-muted/50 rounded-xl border">
-                    <h4 className="text-sm font-medium text-foreground mb-3">Available Analysis Tools</h4>
+                  <h4 className="text-sm font-medium text-foreground mb-3">Available Tools for AI</h4>
                     <div className="flex flex-wrap gap-2 mb-3">
                       {Object.keys(toolsInfo.tools).map((toolName) => (
                         <Badge
@@ -699,12 +636,11 @@ export default function TaskSelector({
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {toolsInfo.healthy_tools} of {toolsInfo.total_tools} tools available for analysis
+                    {toolsInfo.healthy_tools} of {toolsInfo.total_tools} tools available for AI orchestration
                     </p>
                   </div>
                 )}
               </CardContent>
-            )}
           </Card>
 
           {/* Smart Analysis Action Button */}

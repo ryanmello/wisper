@@ -50,6 +50,19 @@ export interface SmartAnalysisRequest {
   additional_params?: Record<string, any>;
 }
 
+// New simplified AI analysis interfaces
+export interface AIAnalysisRequest {
+  repository_url: string;
+  prompt: string;
+}
+
+export interface AIAnalysisResponse {
+  task_id: string;
+  status: string;
+  websocket_url: string;
+  message: string;
+}
+
 export interface SmartAnalysisResponse {
   task_id: string;
   status: string;
@@ -72,7 +85,7 @@ export interface ToolBatch {
 }
 
 export interface SmartAnalysisProgress {
-  type: 'progress' | 'execution_plan' | 'tool_completed' | 'completed' | 'error';
+  type: 'progress' | 'execution_plan' | 'tool_completed' | 'completed' | 'error' | 'ai_message' | 'tool_start' | 'tool_error' | 'ai_analysis.started';
   task_id?: string;
   current_step?: string;
   progress?: number;
@@ -83,7 +96,23 @@ export interface SmartAnalysisProgress {
   execution_time?: number;
   tools_used?: string[];
   error?: string;
+  // Additional fields for AI orchestration
+  content?: string;
+  turn?: number;
+  ai_reasoning?: string;
+  tool_execution?: {
+    tool_name: string;
+    status: string;
+    args: Record<string, any>;
+  };
+  execution_summary?: string;
+  final_response?: string;
+  prompt?: string;
+  message?: string;
 }
+
+// Alias for AI analysis progress (same structure)
+export type AIAnalysisProgress = SmartAnalysisProgress;
 
 export interface ToolExecutionResult {
   tool_name: string;
@@ -178,6 +207,28 @@ export class WhisperAPI {
       return await response.json();
     } catch (error) {
       console.error('Error creating smart task:', error);
+      throw error;
+    }
+  }
+
+  static async createAITask(request: AIAnalysisRequest): Promise<AIAnalysisResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/ai-tasks/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Failed to create AI task: ${response.status} ${response.statusText}${errorData.detail ? ` - ${errorData.detail}` : ''}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating AI task:', error);
       throw error;
     }
   }
@@ -277,6 +328,42 @@ export class WhisperAPI {
 
     ws.onerror = (error) => {
       console.error('Smart WebSocket error:', error);
+      onError(error);
+    };
+
+    ws.onclose = (event) => {
+      onClose(event);
+    };
+
+    return ws;
+  }
+
+  static connectAIWebSocket(
+    websocketUrl: string,
+    taskId: string,
+    request: AIAnalysisRequest,
+    onMessage: (data: AIAnalysisProgress) => void,
+    onError: (error: Event) => void,
+    onClose: (event: CloseEvent) => void
+  ): WebSocket {
+    const ws = new WebSocket(websocketUrl);
+
+    ws.onopen = () => {
+      // Send simplified request with just repository_url and prompt
+      ws.send(JSON.stringify(request));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data: AIAnalysisProgress = JSON.parse(event.data);
+        onMessage(data);
+      } catch (error) {
+        console.error('Error parsing AI WebSocket message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('AI WebSocket error:', error);
       onError(error);
     };
 

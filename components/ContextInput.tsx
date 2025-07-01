@@ -8,15 +8,9 @@ import { WhisperAPI, generateContextSuggestions, ToolRegistryInfo } from "@/lib/
 
 interface ContextInputProps {
   repository: string;
-  onContextSubmit: (context: string, options?: SmartAnalysisOptions) => void;
+  onContextSubmit: (context: string) => void; // Simplified - no complex options needed!
   onBack: () => void;
   detectedLanguage?: string;
-}
-
-interface SmartAnalysisOptions {
-  scope?: 'full' | 'security_focused' | 'performance_focused';
-  depth?: 'surface' | 'deep' | 'comprehensive';
-  target_languages?: string[];
 }
 
 export default function ContextInput({ 
@@ -27,12 +21,6 @@ export default function ContextInput({
 }: ContextInputProps) {
   const [context, setContext] = useState("");
   const [selectedSuggestion, setSelectedSuggestion] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [options, setOptions] = useState<SmartAnalysisOptions>({
-    scope: 'full',
-    depth: 'comprehensive',
-    target_languages: []
-  });
   const [toolsInfo, setToolsInfo] = useState<ToolRegistryInfo | null>(null);
   const [detectedIntent, setDetectedIntent] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -54,7 +42,7 @@ export default function ContextInput({
     loadToolsInfo();
   }, []);
 
-  // Simple intent detection based on keywords
+  // Simple intent detection based on keywords (for UI feedback only)
   useEffect(() => {
     if (!context) {
       setDetectedIntent(null);
@@ -65,19 +53,14 @@ export default function ContextInput({
     
     if (contextLower.includes('security') || contextLower.includes('vulnerabilit')) {
       setDetectedIntent('Security Analysis');
-      setOptions(prev => ({ ...prev, scope: 'security_focused' }));
     } else if (contextLower.includes('performance') || contextLower.includes('optimization')) {
       setDetectedIntent('Performance Analysis');
-      setOptions(prev => ({ ...prev, scope: 'performance_focused' }));
     } else if (contextLower.includes('explore') || contextLower.includes('architecture')) {
       setDetectedIntent('Codebase Exploration');
-      setOptions(prev => ({ ...prev, scope: 'full' }));
     } else if (contextLower.includes('bug') || contextLower.includes('issue')) {
       setDetectedIntent('Code Quality Review');
-      setOptions(prev => ({ ...prev, scope: 'full' }));
     } else {
       setDetectedIntent('General Analysis');
-      setOptions(prev => ({ ...prev, scope: 'full' }));
     }
   }, [context]);
 
@@ -90,7 +73,7 @@ export default function ContextInput({
     if (!context.trim()) return;
     
     setIsAnalyzing(true);
-    onContextSubmit(context, options);
+    onContextSubmit(context); // Simplified - AI handles everything!
   };
 
   const handleCustomInput = (value: string) => {
@@ -119,7 +102,7 @@ export default function ContextInput({
               <span className="text-white font-bold">W</span>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">🧠 Smart Analysis</h1>
+              <h1 className="text-3xl font-bold text-gray-900">🤖 AI Analysis</h1>
               <p className="text-gray-600">
                 Describe what you want to analyze in <strong>{repoName}</strong>
               </p>
@@ -182,71 +165,32 @@ export default function ContextInput({
           </CardContent>
         </Card>
 
-        {/* Advanced Options */}
+        {/* AI Analysis Info */}
         <Card className="mb-6">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Advanced Options</CardTitle>
-                <CardDescription>Fine-tune your analysis parameters</CardDescription>
-              </div>
-              <Button
-                variant="ghost"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                disabled={isAnalyzing}
-              >
-                {showAdvanced ? "Hide" : "Show"} Advanced
-              </Button>
-            </div>
+            <CardTitle className="text-lg">🤖 AI-Powered Analysis</CardTitle>
+            <CardDescription>
+              Our AI will automatically select the best tools and approach based on your prompt
+            </CardDescription>
           </CardHeader>
-          
-          {showAdvanced && (
             <CardContent>
-              <div className="space-y-4">
-                {/* Scope Selection */}
+            <div className="space-y-3">
+              <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">✨</span>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Analysis Scope
-                  </label>
-                  <div className="flex gap-2">
-                    {(['full', 'security_focused', 'performance_focused'] as const).map((scope) => (
-                      <Button
-                        key={scope}
-                        variant={options.scope === scope ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setOptions(prev => ({ ...prev, scope }))}
-                        disabled={isAnalyzing}
-                      >
-                        {scope.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Button>
-                    ))}
+                    <h4 className="font-medium text-blue-900">Intelligent Tool Selection</h4>
+                    <p className="text-sm text-blue-700 mt-1">
+                      No need to configure scope, depth, or languages. Our AI automatically determines what to analyze and how.
+                    </p>
                   </div>
-                </div>
-
-                {/* Depth Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Analysis Depth
-                  </label>
-                  <div className="flex gap-2">
-                    {(['surface', 'deep', 'comprehensive'] as const).map((depth) => (
-                      <Button
-                        key={depth}
-                        variant={options.depth === depth ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setOptions(prev => ({ ...prev, depth }))}
-                        disabled={isAnalyzing}
-                      >
-                        {depth.charAt(0).toUpperCase() + depth.slice(1)}
-                      </Button>
-                    ))}
                   </div>
                 </div>
 
                 {/* Available Tools Info */}
                 {toolsInfo && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2">Available Tools</h4>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Available Tools for AI</h4>
                     <div className="flex flex-wrap gap-2">
                       {Object.keys(toolsInfo.tools).map((toolName) => (
                         <Badge
@@ -259,13 +203,12 @@ export default function ContextInput({
                       ))}
                     </div>
                     <p className="text-xs text-gray-600 mt-2">
-                      {toolsInfo.healthy_tools} of {toolsInfo.total_tools} tools available
+                    {toolsInfo.healthy_tools} of {toolsInfo.total_tools} tools available for AI orchestration
                     </p>
                   </div>
                 )}
               </div>
             </CardContent>
-          )}
         </Card>
 
         {/* Action Button */}
@@ -287,7 +230,7 @@ export default function ContextInput({
             ) : (
               <>
                 <span className="mr-2">🚀</span>
-                Start Smart Analysis
+                Start AI Analysis
               </>
             )}
           </Button>

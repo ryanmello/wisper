@@ -31,9 +31,9 @@ class AnalysisRequest(BaseModel):
             raise ValueError(f'Task type must be one of: {", ".join(valid_types)}')
         return v
 
-# New smart analysis models
+# Legacy smart analysis models (complex)
 class SmartAnalysisRequest(BaseModel):
-    """Request model for smart context-based analysis."""
+    """Request model for smart context-based analysis (used by /smart-tasks/ endpoint only)."""
     repository_url: str = Field(..., description="GitHub repository URL")
     context: str = Field(..., description="Natural language description of what to analyze")
     intent: Optional[str] = Field(None, description="Explicit intent override")
@@ -69,6 +69,32 @@ class SmartAnalysisRequest(BaseModel):
             raise ValueError(f'Depth must be one of: {", ".join(valid_depths)}')
         return v
 
+# Simplified AI analysis models
+class AIAnalysisRequest(BaseModel):
+    """Simplified request model for AI-driven analysis - just repository and prompt!"""
+    repository_url: str = Field(..., description="GitHub repository URL")
+    prompt: str = Field(..., min_length=10, max_length=1000, description="Natural language prompt describing what you want to analyze")
+    
+    @field_validator('repository_url')
+    @classmethod
+    def validate_repository_url(cls, v):
+        """Validate that the repository URL is a valid GitHub URL."""
+        github_pattern = r'^https://github\.com/[a-zA-Z0-9\-_\.]+/[a-zA-Z0-9\-_\.]+/?$'
+        if not re.match(github_pattern, v.rstrip('/')):
+            raise ValueError('Must be a valid GitHub repository URL (https://github.com/owner/repo)')
+        return v.rstrip('/')
+    
+    @field_validator('prompt')
+    @classmethod
+    def validate_prompt(cls, v):
+        """Validate the analysis prompt."""
+        v = v.strip()
+        if len(v) < 10:
+            raise ValueError('Prompt must be at least 10 characters long')
+        if len(v) > 1000:
+            raise ValueError('Prompt must be less than 1000 characters')
+        return v
+
 class AnalysisResponse(BaseModel):
     """Response model for analysis task creation."""
     task_id: str = Field(..., description="Unique task identifier")
@@ -86,6 +112,13 @@ class SmartAnalysisResponse(BaseModel):
     message: str = Field(..., description="Status message")
     websocket_url: str = Field(..., description="WebSocket URL for real-time updates")
     analysis_plan: Optional[Dict[str, Any]] = Field(None, description="Initial analysis plan")
+
+class AIAnalysisResponse(BaseModel):
+    """Simplified response model for AI-driven analysis task creation."""
+    task_id: str = Field(..., description="Unique task identifier")
+    status: str = Field(default="created", description="Task status")
+    websocket_url: str = Field(..., description="WebSocket URL for real-time AI orchestration updates")
+    message: str = Field(..., description="Status message")
 
 class TaskStatus(BaseModel):
     """Model for task status information."""

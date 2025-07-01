@@ -12,11 +12,7 @@ import { getRepoName, scrollToTop } from "@/lib/utils";
 
 type Step = "repository" | "task" | "execution" | "smart-execution" | "results";
 
-interface SmartAnalysisOptions {
-  scope?: "full" | "security_focused" | "performance_focused";
-  depth?: "surface" | "deep" | "comprehensive";
-  target_languages?: string[];
-}
+
 
 const STEPS = [
   {
@@ -46,8 +42,7 @@ export default function Home() {
   const [selectedRepository, setSelectedRepository] = useState<string>("");
   const [selectedTask, setSelectedTask] = useState<TaskType | null>(null);
   const [smartAnalysisContext, setSmartAnalysisContext] = useState<string>("");
-  const [smartAnalysisOptions, setSmartAnalysisOptions] =
-    useState<SmartAnalysisOptions>({});
+
   const [analysisResults, setAnalysisResults] = useState<
     AnalysisProgress["results"] | SmartAnalysisResults | null
   >(null);
@@ -71,12 +66,8 @@ export default function Home() {
     scrollToTop();
   };
 
-  const handleStartSmartTask = (
-    context: string,
-    options?: SmartAnalysisOptions
-  ) => {
+  const handleStartSmartTask = (context: string) => {
     setSmartAnalysisContext(context);
-    setSmartAnalysisOptions(options || {});
     setCurrentStep("smart-execution");
     scrollToTop();
   };
@@ -94,7 +85,6 @@ export default function Home() {
     setCurrentStep("task");
     setSelectedTask(null);
     setSmartAnalysisContext("");
-    setSmartAnalysisOptions({});
     setAnalysisResults(null);
     scrollToTop();
   };
@@ -111,7 +101,6 @@ export default function Home() {
         setCurrentStep("task");
         setSelectedTask(null);
         setSmartAnalysisContext("");
-        setSmartAnalysisOptions({});
         break;
       case "results":
         setCurrentStep("task");
@@ -252,7 +241,6 @@ export default function Home() {
           <SmartTaskExecution
             repository={selectedRepository}
             context={smartAnalysisContext}
-            options={smartAnalysisOptions}
             onBack={handleBack}
             onComplete={handleTaskComplete}
           />
