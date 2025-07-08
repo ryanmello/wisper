@@ -2,7 +2,8 @@ import os
 import re
 import time
 import json
-from typing import Dict
+from typing import Dict, List
+from dataclasses import dataclass
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.async_tool_decorator import async_tool
 from utils.tool_metadata_decorator import tool_category
@@ -13,6 +14,139 @@ from langchain_openai import ChatOpenAI
 
 logger = get_logger(__name__)
 
+@dataclass
+class VulnerabilityInfo:
+    """Represents a parsed vulnerability from govulncheck output."""
+    vuln_id: str
+    description: str
+    module_name: str
+    current_version: str
+    fixed_version: str
+    is_standard_library: bool = False
+    
+    def __str__(self):
+        return f"{self.vuln_id}: {self.module_name}@{self.current_version} → {self.fixed_version}"
+
+@dataclass
+class GovulncheckResult:
+    """Result of parsing govulncheck output."""
+    is_govulncheck: bool
+    vulnerabilities: List[VulnerabilityInfo]
+    original_prompt: str
+    
+class GovulncheckParser:
+    """Parser for govulncheck command output to extract structured vulnerability information."""
+    
+    # Regex patterns for detecting govulncheck output
+    VULN_HEADER_PATTERN = re.compile(r'Vulnerability #(\d+): (GO-\d+-\d+)')
+    FOUND_IN_PATTERN = re.compile(r'Found in:\s+(.+?)@(.+?)(?:\s|$)')
+    FIXED_IN_PATTERN = re.compile(r'Fixed in:\s+(.+?)@(.+?)(?:\s|$)')
+    STANDARD_LIB_PATTERN = re.compile(r'Standard library')
+    
+    @classmethod
+    def detect_govulncheck_output(cls, prompt: str) -> bool:
+        """Detect if the input appears to be govulncheck output."""
+        # Look for key govulncheck indicators
+        has_vulnerability_header = "Vulnerability #" in prompt
+        has_found_fixed_pattern = "Found in:" in prompt and "Fixed in:" in prompt
+        has_vuln_id = "GO-20" in prompt  # Vulnerability ID pattern like GO-2025-3770
+        
+        # Need at least 2 indicators to confidently identify govulncheck output
+        indicators = [has_vulnerability_header, has_found_fixed_pattern, has_vuln_id]
+        return sum(indicators) >= 2
+    
+    @classmethod
+    def parse_govulncheck_output(cls, prompt: str) -> GovulncheckResult:
+        """Parse govulncheck output into structured vulnerability information."""
+        if not cls.detect_govulncheck_output(prompt):
+            return GovulncheckResult(
+                is_govulncheck=False,
+                vulnerabilities=[],
+                original_prompt=prompt
+            )
+        
+        vulnerabilities = []
+        lines = prompt.split('\n')
+        current_vuln = None
+        current_description = ""
+        is_standard_lib = False
+        
+        for line in lines:
+            line = line.strip()
+            
+            # Check for vulnerability header (e.g., "Vulnerability #1: GO-2025-3770")
+            vuln_match = cls.VULN_HEADER_PATTERN.search(line)
+            if vuln_match:
+                # Save previous vulnerability if exists
+                if current_vuln:
+                    vulnerabilities.append(current_vuln)
+                
+                vuln_id = vuln_match.group(2)
+                # Extract description from the rest of the line
+                desc_start = line.find(vuln_id) + len(vuln_id)
+                current_description = line[desc_start:].strip()
+                current_vuln = None
+                is_standard_lib = False
+                continue
+            
+            # Check for standard library indicator
+            if cls.STANDARD_LIB_PATTERN.search(line):
+                is_standard_lib = True
+                continue
+            
+            # Look for Found in and Fixed in patterns
+            found_match = cls.FOUND_IN_PATTERN.search(line)
+            fixed_match = cls.FIXED_IN_PATTERN.search(line)
+            
+            if found_match and fixed_match:
+                # Both patterns in same line
+                module_name = found_match.group(1)
+                current_version = found_match.group(2)
+                fixed_version = fixed_match.group(2)
+                
+                current_vuln = VulnerabilityInfo(
+                    vuln_id=vuln_id,
+                    description=current_description,
+                    module_name=module_name,
+                    current_version=current_version,
+                    fixed_version=fixed_version,
+                    is_standard_library=is_standard_lib
+                )
+            elif found_match:
+                # Only found pattern, look for fixed in subsequent lines
+                module_name = found_match.group(1)
+                current_version = found_match.group(2)
+                
+                # Look ahead for Fixed in pattern
+                current_line_index = lines.index(line)
+                for next_line in lines[current_line_index+1:current_line_index+5]:
+                    fixed_match = cls.FIXED_IN_PATTERN.search(next_line.strip())
+                    if fixed_match:
+                        fixed_version = fixed_match.group(2)
+                        current_vuln = VulnerabilityInfo(
+                            vuln_id=vuln_id,
+                            description=current_description,
+                            module_name=module_name,
+                            current_version=current_version,
+                            fixed_version=fixed_version,
+                            is_standard_library=is_standard_lib
+                        )
+                        break
+        
+        # Add the last vulnerability if exists
+        if current_vuln:
+            vulnerabilities.append(current_vuln)
+        
+        logger.info(f"Parsed {len(vulnerabilities)} vulnerabilities from govulncheck output")
+        for vuln in vulnerabilities:
+            logger.info(f"  - {vuln}")
+        
+        return GovulncheckResult(
+            is_govulncheck=True,
+            vulnerabilities=vulnerabilities,
+            original_prompt=prompt
+        )
+
 @tool_category("git_operations")
 @async_tool
 async def apply_fixes(repository_path: str, prompt: str) -> StandardToolResponse:
@@ -22,8 +156,7 @@ async def apply_fixes(repository_path: str, prompt: str) -> StandardToolResponse
     the repository context and implement the requested modifications. It handles any type 
     of Go repository changes including dependency updates, code modifications, and vulnerability fixes.
     
-    Prerequisites: Repository must be cloned locally (Go repository)
-    Often followed by: create_pull_request to commit and submit the applied changes
+    Prerequisites: Repository must be cloned locally
     Compatible with: Human-readable prompts from Veda or raw govulncheck output
     
     Args:
@@ -73,17 +206,34 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
     try:
         logger.info("Starting AI-based Go repository analysis and modification")
         
+        # Check if this is govulncheck output and parse it
+        govulncheck_result = GovulncheckParser.parse_govulncheck_output(prompt)
+        
         # Read relevant files for AI context
         file_contents = _read_go_repository_files(repository_path)
         logger.info(f"Read {len(file_contents)} files for AI context")
         
-        # Send to AI for analysis
-        ai_response = await _send_to_ai(prompt, file_contents)
+        # Send to AI for analysis using appropriate prompt strategy
+        if govulncheck_result.is_govulncheck:
+            logger.info(f"Detected govulncheck output with {len(govulncheck_result.vulnerabilities)} vulnerabilities")
+            ai_response = await _send_structured_vulnerabilities_to_ai(govulncheck_result, file_contents)
+        else:
+            logger.info("Processing as human-readable prompt")
+            ai_response = await _send_to_ai(prompt, file_contents)
+        
         logger.info("Received AI analysis response")
         logger.debug(f"Raw AI response: {ai_response}")
         
         # Parse AI response
         fix_result = _parse_ai_response(ai_response)
+        
+        # Additional validation for govulncheck-based fixes
+        if govulncheck_result.is_govulncheck:
+            validation_result = _validate_govulncheck_fixes(govulncheck_result.vulnerabilities, fix_result)
+            if not validation_result.success:
+                logger.warning(f"Govulncheck fix validation failed: {validation_result.message}")
+                # Add validation warning to fix explanation
+                fix_result.fix_explanation = f"{fix_result.fix_explanation}\n\nValidation Warning: {validation_result.message}"
         
         if not fix_result.success:
             execution_time_ms = int((time.time() - start_time) * 1000)
@@ -94,7 +244,9 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
                     "action": "ai_analysis_failed",
                     "files_modified": 0,
                     "files_failed": 0,
-                    "ai_explanation": fix_result.fix_explanation
+                    "ai_explanation": fix_result.fix_explanation,
+                    "govulncheck_detected": govulncheck_result.is_govulncheck,
+                    "vulnerabilities_found": len(govulncheck_result.vulnerabilities) if govulncheck_result.is_govulncheck else 0
                 },
                 error=StandardError(
                     message="AI could not generate safe repository changes",
@@ -123,7 +275,9 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
                     "files_failed": 0,
                     "ai_explanation": fix_result.fix_explanation,
                     "build_output": build_result.build_output,
-                    "build_error": build_result.error_message
+                    "build_error": build_result.error_message,
+                    "govulncheck_detected": govulncheck_result.is_govulncheck,
+                    "vulnerabilities_found": len(govulncheck_result.vulnerabilities) if govulncheck_result.is_govulncheck else 0
                 },
                 error=StandardError(
                     message="AI-generated changes failed build validation",
@@ -184,7 +338,10 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
         
         # Create summary message
         if applied_files and not failed_files:
-            summary = f"Successfully applied AI-generated Go repository changes to {len(applied_files)} files"
+            if govulncheck_result.is_govulncheck:
+                summary = f"Successfully applied fixes for {len(govulncheck_result.vulnerabilities)} vulnerabilities to {len(applied_files)} files"
+            else:
+                summary = f"Successfully applied AI-generated Go repository changes to {len(applied_files)} files"
         elif applied_files and failed_files:
             summary = f"Applied changes to {len(applied_files)} files, {len(failed_files)} files failed"
         else:
@@ -199,6 +356,8 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
             "applied_files": applied_files,
             "failed_files": failed_files,
             "fix_explanation": fix_result.fix_explanation,
+            "govulncheck_detected": govulncheck_result.is_govulncheck,
+            "vulnerabilities_addressed": len(govulncheck_result.vulnerabilities) if govulncheck_result.is_govulncheck else 0,
             "build_validation": {
                 "success": build_result.success,
                 "duration": build_result.duration,
@@ -206,6 +365,20 @@ async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_ti
                 "go_sum_updated": build_result.updated_go_sum is not None
             }
         }
+        
+        # Add vulnerability details if this was govulncheck output
+        if govulncheck_result.is_govulncheck:
+            response_data["vulnerabilities"] = [
+                {
+                    "vuln_id": vuln.vuln_id,
+                    "description": vuln.description,
+                    "module": vuln.module_name,
+                    "current_version": vuln.current_version,
+                    "fixed_version": vuln.fixed_version,
+                    "is_standard_library": vuln.is_standard_library
+                }
+                for vuln in govulncheck_result.vulnerabilities
+            ]
         
         # Add error information if there were failures
         error_info = None
@@ -361,6 +534,130 @@ async def _send_to_ai(prompt: str, file_contents: Dict[str, str]) -> str:
     response = await llm.ainvoke(messages)
     return response.content
 
+async def _send_structured_vulnerabilities_to_ai(govulncheck_result: GovulncheckResult, file_contents: Dict[str, str]) -> str:
+    """Send structured vulnerability information to AI for analysis and change generation."""
+    files_section = ""
+    for file_path, content in file_contents.items():
+        files_section += f"\n--- {file_path} ---\n{content}\n"
+    
+    # Create structured vulnerability summary
+    vuln_summary = []
+    go_version_updates = []
+    dependency_updates = []
+    
+    for vuln in govulncheck_result.vulnerabilities:
+        if vuln.is_standard_library:
+            # Standard library vulnerability - need Go version update
+            go_version_updates.append(f"  - Update Go version from {vuln.current_version} to {vuln.fixed_version} (fixes {vuln.vuln_id})")
+        else:
+            # Third-party dependency update
+            dependency_updates.append(f"  - Update {vuln.module_name} from {vuln.current_version} to {vuln.fixed_version} (fixes {vuln.vuln_id})")
+    
+    if go_version_updates:
+        vuln_summary.append("STANDARD LIBRARY UPDATES NEEDED:")
+        vuln_summary.extend(go_version_updates)
+        vuln_summary.append("")
+    
+    if dependency_updates:
+        vuln_summary.append("DEPENDENCY UPDATES NEEDED:")
+        vuln_summary.extend(dependency_updates)
+        vuln_summary.append("")
+    
+    vuln_text = "\n".join(vuln_summary)
+    
+    system_prompt = """You are a Go development expert specializing in security vulnerability fixes.
+
+    CRITICAL: YOU MUST PRESERVE ALL EXISTING DEPENDENCIES - NEVER REMOVE ANY require ENTRIES!
+
+    SECURITY FIX STRATEGY:
+    1. PRESERVE ALL existing dependencies (never remove require entries) - THIS IS MANDATORY
+    2. Update ONLY the vulnerable dependencies to their fixed versions
+    3. For standard library vulnerabilities: Update the Go version in go.mod
+    4. For dependency vulnerabilities: Update the specific module version in the require block
+    5. Always provide complete file content for any file you modify
+    6. Be conservative - make only the minimal changes needed to fix vulnerabilities
+
+    GO.MOD MODIFICATION RULES:
+    - PRESERVE ALL existing dependencies (never remove require entries) - CRITICAL
+    - Provide COMPLETE go.mod structure (module, go version, require blocks)
+    - Update ONLY the vulnerable module versions as specified
+    - Update Go version if standard library vulnerabilities are present
+    - Maintain proper formatting and indentation
+    - Include ALL dependencies from the original file, even if not being updated
+
+    EXAMPLES OF CORRECT FIXES:
+    
+    Example 1 - Third-party dependency update:
+    Original: github.com/go-chi/chi/v5 v5.2.1
+    Required: github.com/go-chi/chi/v5 v5.2.2
+    
+    Example 2 - Standard library fix (Go version update):
+    Original: go 1.24.2
+    Required: go 1.24.4 (to fix crypto/x509 and syscall vulnerabilities)
+    
+    Example 3 - Mixed updates:
+    - Update go 1.24.2 → go 1.24.4 (fixes standard library vulns)
+    - Update golang.org/x/net v0.34.0 → v0.38.0 (fixes dependency vuln)
+
+    OUTPUT: Return valid JSON only, no extra text.
+
+    Success format:
+    ```json
+    {
+        "success": true,
+        "updated_files": {
+            "go.mod": "module example\\n\\ngo 1.24.4\\n\\nrequire (\\n\\tgithub.com/existing/dep1 v1.2.3\\n\\tgolang.org/x/net v0.38.0\\n\\tgithub.com/go-chi/chi/v5 v5.2.2\\n\\tgithub.com/another/dep v1.0.0\\n)"
+        },
+        "fix_explanation": "Updated Go version to 1.24.4 to fix standard library vulnerabilities and updated vulnerable dependencies to their fixed versions",
+        "changes_made": 3
+    }
+    ```
+
+    Failure format:
+    ```json
+    {
+        "success": false,
+        "updated_files": {},
+        "fix_explanation": "Why changes cannot be applied safely",
+        "changes_made": 0
+    }
+    ```"""
+
+    human_prompt = f"""Please fix the following security vulnerabilities by updating the vulnerable dependencies:
+
+    {vuln_text}
+
+    CURRENT REPOSITORY FILES:
+    {files_section}
+    
+    Please implement the EXACT vulnerability fixes specified above. For each vulnerability:
+    1. Update the vulnerable module to its fixed version
+    2. If standard library vulnerabilities are present, update the Go version accordingly
+    3. Preserve ALL other existing dependencies unchanged
+    
+    Provide the complete updated go.mod file with all dependencies preserved and only the vulnerable ones updated to their fixed versions.
+
+    Return your response in the JSON format specified in the system prompt."""
+
+    messages = [
+        SystemMessage(content=system_prompt),
+        HumanMessage(content=human_prompt)
+    ]
+    
+    logger.info("Sending structured vulnerability data to AI for analysis")
+    logger.info(f"Vulnerability summary: {len(govulncheck_result.vulnerabilities)} vulnerabilities")
+    for vuln in govulncheck_result.vulnerabilities:
+        logger.info(f"  - {vuln}")
+    
+    llm = ChatOpenAI(
+        model="gpt-4", 
+        temperature=0, 
+        api_key=settings.OPENAI_API_KEY
+    )
+    
+    response = await llm.ainvoke(messages)
+    return response.content
+
 class FixResult:
     """Result of AI repository change analysis."""
     def __init__(self, success: bool, updated_files: Dict[str, str], fix_explanation: str, 
@@ -402,4 +699,32 @@ def _parse_ai_response(ai_response: str) -> FixResult:
             changes_made=0,
             error_message=str(e)
         )
+
+def _validate_govulncheck_fixes(vulnerabilities: List[VulnerabilityInfo], fix_result: FixResult) -> FixResult:
+    """Validate if the AI-generated fixes are reasonable for the govulncheck output."""
+    if not fix_result.success:
+        return FixResult(
+            success=False, 
+            updated_files={}, 
+            fix_explanation="AI failed to generate fixes.", 
+            changes_made=0
+        )
+
+    # Basic validation: ensure go.mod is being updated for dependency fixes
+    if not fix_result.updated_files.get("go.mod"):
+        return FixResult(
+            success=False,
+            updated_files={},
+            fix_explanation="Expected go.mod updates for vulnerability fixes, but none provided.",
+            changes_made=0
+        )
+
+    # If we reach here, assume the AI did a reasonable job
+    # More sophisticated validation could be added later if needed
+    return FixResult(
+        success=True, 
+        updated_files=fix_result.updated_files, 
+        fix_explanation="Vulnerability fixes appear reasonable.", 
+        changes_made=fix_result.changes_made
+    )
 
