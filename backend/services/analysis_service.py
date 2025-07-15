@@ -1,494 +1,308 @@
 import asyncio
-import json
-import uuid
-from typing import Dict, Any, Optional
-from fastapi import WebSocket
-import logging
-from agents.codebase_exploration_agent import CodebaseExplorationAgent
-from agents.dependency_audit_agent import DependencyAuditAgent
-from agents.smart_analysis_agent import SmartAnalysisAgent
-from agents.smart_agent import SmartAgent  # New AI-driven agent
-from core.tool_registry import get_tool_registry, initialize_tool_registry
+from datetime import datetime
+from typing import Any, AsyncGenerator, Dict
 
-logger = logging.getLogger(__name__)
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
+from config.settings import settings
+from models.api_models import AnalysisResults, OrchestratorUpdate, ProgressInfo, StandardError, StandardToolResponse, StandardWebSocketMessage, ToolInfo
+from core.orchestrator import Orchestrator
+from utils.logging_config import get_logger
+from services.websocket_service import websocket_service
+from services.task_service import task_service
 
-class AnalysisService:
-    """Service to manage repository analysis tasks and WebSocket connections."""
+logger = get_logger(__name__)
+
+class AnalysisService:    
+    def __init__(self):
+        self.orchestrator = Orchestrator()
+        self.user_prompt = None
+        self.start_time = None
+        self.total_steps = 12
+
+        self.llm = ChatOpenAI(
+            model="gpt-4", 
+            temperature=0.1, 
+            api_key=settings.OPENAI_API_KEY
+        )
     
-    def __init__(self, openai_api_key: str):
-        self.openai_api_key = openai_api_key
-        self.smart_agent = SmartAnalysisAgent(openai_api_key=openai_api_key)  # Legacy agent
-        self.ai_smart_agent = SmartAgent(openai_api_key=openai_api_key)  # New AI-driven agent
-        
-        self.active_connections: Dict[str, WebSocket] = {}
-        self.active_tasks: Dict[str, asyncio.Task] = {}
-        self.task_metadata: Dict[str, Dict[str, Any]] = {}
-        self._initialized = False
-        
-    async def initialize(self):
-        """Initialize the analysis service and tool registry."""
-        if self._initialized:
-            return
-        
-        await initialize_tool_registry()
-        
-        self._initialized = True
-        logger.info("Analysis service initialized successfully")
-        
-    async def create_task(
-        self, 
-        repository_url: str, 
-        task_type: str = "explore-codebase"
-    ) -> str:
-        """Create a new analysis task and return task ID."""
-        task_id = str(uuid.uuid4())
-        
-        self.task_metadata[task_id] = {
-            "repository_url": repository_url,
-            "task_type": task_type
-        }
-        
-        logger.info(f"Created analysis task {task_id} for repository: {repository_url}")
-        return task_id
-    
-    async def create_smart_task(
-        self, 
-        repository_url: str, 
-        context: str,
-        intent: Optional[str] = None,
-        target_languages: Optional[list] = None,
-        scope: str = "full",
-        depth: str = "comprehensive",
-        additional_params: Optional[Dict] = None
-    ) -> str:
-        task_id = str(uuid.uuid4())
-        logger.info(f"Created smart analysis task {task_id} for repository: {repository_url}")
-        logger.info(f"Context: {context[:100]}...")
-        return task_id
-    
-    async def create_ai_task(self, repository_url: str, prompt: str) -> str:
-        """Create a new AI-driven analysis task using simplified request (just prompt!)."""
-        task_id = str(uuid.uuid4())
-        
-        self.task_metadata[task_id] = {
-            "repository_url": repository_url,
-            "prompt": prompt,
-            "task_type": "ai_analysis"
-        }
-        
-        logger.info(f"Created AI analysis task {task_id} for repository: {repository_url}")
-        logger.info(f"User prompt: {prompt[:100]}...")
-        return task_id
-    
-    async def connect_websocket(self, task_id: str, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections[task_id] = websocket
-        logger.info(f"WebSocket connected for task {task_id}")
-    
-    async def disconnect_websocket(self, task_id: str):
-        if task_id in self.active_connections:
-            del self.active_connections[task_id]
-        
-        if task_id in self.active_tasks:
-            task = self.active_tasks[task_id]
-            if isinstance(task, asyncio.Task):
-                task.cancel()
-            del self.active_tasks[task_id]
-        
-        if task_id in self.task_metadata:
-            del self.task_metadata[task_id]
-        
-        logger.info(f"WebSocket disconnected for task {task_id}")
-    
-    async def send_message(self, task_id: str, message: Dict[str, Any]):
-        """Send a message to the WebSocket client."""
-        if task_id in self.active_connections:
-            try:
-                await self.active_connections[task_id].send_text(json.dumps(message))
-            except Exception as e:
-                logger.error(f"Failed to send message to {task_id}: {e}")
-                await self.disconnect_websocket(task_id)
-    
-    async def start_analysis(
-        self, 
-        task_id: str, 
-        repository_url: str, 
-        task_type: str = "explore-codebase"
-    ):        
+    async def start_analysis(self, task_id: str, repository_url: str, prompt: str):
+        analysis_task = asyncio.create_task(self._run_analysis(task_id, repository_url, prompt))
+        task_service.active_tasks[task_id] = analysis_task
+        logger.info(f"Created analysis task for {task_id}")
+
+    async def _run_analysis(self, task_id: str, repository_url: str, prompt: str):
         try:
-            await self._run_analysis(task_id, repository_url, task_type)
-        except asyncio.CancelledError:
-            logger.info(f"Analysis task {task_id} was cancelled")
-            raise
-        except Exception as e:
-            logger.error(f"Analysis task {task_id} failed: {e}")
-            raise
-    
-    async def start_smart_analysis(
-        self, 
-        task_id: str, 
-        repository_url: str, 
-        context: str,
-        intent: Optional[str] = None,
-        target_languages: Optional[list] = None,
-        scope: str = "full",
-        depth: str = "comprehensive",
-        additional_params: Optional[Dict] = None
-    ):
-        """Start smart repository analysis with AI-powered tool selection."""
-        
-        await self.initialize()
-        
-        try:
-            await self._run_ai_smart_analysis(
-                task_id, repository_url, context, intent, target_languages, 
-                scope, depth, additional_params
-            )
-        except asyncio.CancelledError:
-            logger.info(f"Smart analysis task {task_id} was cancelled")
-            raise
-        except Exception as e:
-            logger.error(f"Smart analysis task {task_id} failed: {e}")
-            raise
-    
-    async def start_ai_analysis(self, task_id: str, repository_url: str, prompt: str):
-        """Start simplified AI-driven analysis with just a prompt."""
-        
-        await self.initialize()
-        
-        try:
-            await self._run_simple_ai_analysis(task_id, repository_url, prompt)
+            await websocket_service.send_message(task_id, {
+                "type": "progress",
+                "task_id": task_id,
+                "timestamp": "",
+                "progress": {
+                    "percentage": 0,
+                    "current_step": "Starting AI Analysis",
+                    "step_number": 0,
+                    "total_steps": 10
+                },
+                "ai_message": "AI is analyzing your repository based on your prompt..."
+            })
+            
+            logger.info(f"Starting analysis for task {task_id}")
+            logger.info(f"Repository: {repository_url}")
+            logger.info(f"Prompt: {prompt}")
+            
+            # on every update from analyze repository
+            # send a websocket message to update the client
+            # end task if the update type is 'analysis_completed' or 'analysis_error' 
+            async for update in self._analyze_repository(task_id, repository_url, prompt):
+                await websocket_service.send_message(task_id, update)
+                
+                if update["type"] in ["analysis_completed", "analysis_error"]:
+                    logger.info(f"AI analysis task {task_id} finished with type: {update['type']}")
+                    break
+
         except asyncio.CancelledError:
             logger.info(f"AI analysis task {task_id} was cancelled")
             raise
         except Exception as e:
             logger.error(f"AI analysis task {task_id} failed: {e}")
             raise
-    
-    async def _run_analysis(
-        self, 
-        task_id: str, 
-        repository_url: str, 
-        task_type: str
-    ):
-        """Execute repository analysis using the appropriate specialized agent."""
+        finally:
+            if task_id in task_service.active_tasks:
+                del task_service.active_tasks[task_id]
+
+    async def _analyze_repository(self, task_id: str, repository_url: str, prompt: str) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Perform repository analysis based on a user prompt.
+        
+        Args:
+            repository_url: URL of repository
+            prompt: User prompt
+            
+        Yields:
+            Progress updates and results from the AI orchestration
+        """
+        logger.info(f"Starting analysis for {repository_url} with context: {prompt[:100]}...")
+        
+        self.user_prompt = prompt
+        self.start_time = datetime.now()
+        
         try:
-            await self._send_task_started(task_id, repository_url, task_type)
-            
-            agent = self._create_agent(task_type)
-            
-            async for update in agent.analyze_repository(repository_url):
-                await self._handle_analysis_update(task_id, update, task_type)
+            async for update in self.orchestrator.process_prompt(prompt, repository_url):
+                standardized_update = self._standardize_update(task_id, update)
+                yield standardized_update.model_dump()
                 
-                if update["type"] == "completed":
-                    break
-                    
         except Exception as e:
-            await self._handle_analysis_error(task_id, e, "analysis_execution")
+            logger.error(f"Analysis failed: {e}")
+            error_message = StandardWebSocketMessage(
+                type="analysis_error",
+                task_id=task_id,
+                error=StandardError(
+                    message=str(e),
+                    details="Analysis orchestration failed",
+                    error_type="orchestration_error"
+                )
+            )
+            yield error_message.model_dump()
 
-    def _create_agent(self, task_type: str):
-        agent_map = {
-            "dependency-audit": DependencyAuditAgent,
-            "explore-codebase": CodebaseExplorationAgent
-        }
+    def _standardize_update(self, task_id: str, orchestrator_update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Standardized orchestrator updates to WebSocket message format to client consistency."""        
+        update_type = orchestrator_update.type
         
-        agent_class = agent_map.get(task_type, CodebaseExplorationAgent)
-        return agent_class(self.openai_api_key)
-
-    async def _send_task_started(self, task_id: str, repository_url: str, task_type: str):
-        """Send task started message."""
-        await self.send_message(task_id, {
-            "type": "task.started",
-            "task_id": task_id,
-            "status": "running",
-            "repository_url": repository_url,
-            "task_type": task_type
-        })
-
-    async def _handle_analysis_update(self, task_id: str, update: Dict[str, Any], task_type: str):
-        """Handle different types of analysis updates."""
-        if update["type"] == "progress":
-            await self._send_progress_update(task_id, update)
-        elif update["type"] == "completed":
-            await self._send_completion_message(task_id, update["results"], task_type)
-
-    async def _send_progress_update(self, task_id: str, update: Dict[str, Any]):
-        """Send progress update message."""
-        await self.send_message(task_id, {
-            "type": "task.progress",
-            "task_id": task_id,
-            "current_step": update["current_step"],
-            "progress": update["progress"],
-            "partial_results": update.get("partial_results", {})
-        })
-
-    async def _send_completion_message(self, task_id: str, results: Dict[str, Any], task_type: str):
-        """Send task completion message with formatted results."""
-        formatted_results = self._format_analysis_results(results, task_type)
-        
-        await self.send_message(task_id, {
-            "type": "task.completed",
-            "task_id": task_id,
-            "results": {
-                "summary": self._generate_summary(results),
-                "statistics": self._generate_statistics(results),
-                "detailed_results": formatted_results
-            }
-        })
-
-    def _format_analysis_results(self, results: Dict[str, Any], task_type: str) -> Dict[str, Any]:
-        """Format analysis results based on task type."""
-        if task_type == "dependency-audit":
-            return self._format_dependency_audit_results(results)
+        if update_type == "content":
+            return self._handle_content_update(task_id, orchestrator_update)
+        elif update_type == "status":
+            return self._handle_status_update(task_id, orchestrator_update)
+        elif update_type == "completed":
+            return self._handle_completion_update(task_id, orchestrator_update)
+        elif update_type == "error":
+            return self._handle_error_update(task_id, orchestrator_update)
         else:
-            return self._format_codebase_exploration_results(results)
+            return self._handle_default_update(task_id, orchestrator_update)
 
-    def _format_dependency_audit_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """Format dependency audit specific results."""
-        formatted = {
-            "dependency_audit": {
-                "summary": results.get("summary", "Vulnerability audit completed"),
-                "vulnerability_scan": results.get("vulnerability_scan", {}),
-                "github_pr": results.get("github_pr", {}),
-                "build_validation": results.get("build_validation", {})
-            }
-        }
-        
-        if results.get("vulnerability_scan"):
-            formatted["vulnerability_scanner"] = results["vulnerability_scan"]
-            
-        return formatted
+    def _handle_content_update(self, task_id: str, update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Handle content-type updates."""
+        turn = (update.metadata.turn or 0) if update.metadata else 0
+        return StandardWebSocketMessage(
+            type="progress",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step="Analysis",
+                step_number=turn,
+                total_steps=self.total_steps
+            ),
+            ai_message=update.message
+        )
 
-    def _format_codebase_exploration_results(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """Format codebase exploration specific results."""
-        return {
-            "whisper_analysis": {
-                "analysis": results.get("architectural_insights", ""),
-                "file_structure": results.get("file_structure", {}),
-                "language_analysis": results.get("language_analysis", {}),
-                "architecture_patterns": results.get("architecture_patterns", []),
-                "main_components": results.get("main_components", []),
-                "dependencies": results.get("dependencies", {})
-            }
-        }
+    def _handle_status_update(self, task_id: str, update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Handle status-type updates, including tool execution states."""
+        message = update.message
+        metadata = update.metadata
+        tool_name = metadata.tool_name if metadata else None
+        turn = (metadata.turn or 0) if metadata else 0
+        
+        # Check if this is a tool-related status update
+        if tool_name and self._is_tool_status_message(message):
+            return self._create_tool_status_message(task_id, update, tool_name, turn)
+        
+        # Default progress message for non-tool status updates
+        return StandardWebSocketMessage(
+            type="progress",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step=message,
+                step_number=turn,
+                total_steps=self.total_steps
+            )
+        )
 
-    async def _handle_analysis_error(self, task_id: str, error: Exception, context: str):
-        """Handle analysis errors with context."""
-        error_message = f"Analysis failed during {context}: {str(error)}"
-        logger.error(f"Task {task_id} - {error_message}", exc_info=True)
+    def _is_tool_status_message(self, message: str) -> bool:
+        """Check if message indicates tool execution status."""
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in ["executing", "completed", "failed"])
+
+    def _create_tool_status_message(self, task_id: str, update: OrchestratorUpdate, tool_name: str, turn: int) -> StandardWebSocketMessage:
+        """Create appropriate tool status message based on message content."""
+        message = update.message.lower()
         
-        await self.send_message(task_id, {
-            "type": "task.error",
-            "task_id": task_id,
-            "error": error_message,
-            "context": context
-        })
+        if "executing" in message:
+            return self._create_tool_started_message(task_id, update, tool_name, turn)
+        elif "completed" in message and "failed" not in message:
+            return self._create_tool_completed_message(task_id, update, tool_name, turn)
+        
+        # Fallback to progress message
+        return StandardWebSocketMessage(
+            type="progress",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step=update.message,
+                step_number=turn,
+                total_steps=self.total_steps
+            )
+        )
+
+    def _create_tool_started_message(self, task_id: str, update: OrchestratorUpdate, tool_name: str, turn: int) -> StandardWebSocketMessage:
+        """Create tool started message."""
+        return StandardWebSocketMessage(
+            type="tool_started",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step=f"Executing {tool_name.replace('_', ' ').title()}",
+                step_number=turn,
+                total_steps=self.total_steps
+            ),
+            tool=ToolInfo(name=tool_name, status="started")
+        )
+
+    def _create_tool_completed_message(self, task_id: str, update: OrchestratorUpdate, tool_name: str, turn: int) -> StandardWebSocketMessage:
+        """Create tool completed message."""
+        mock_result = StandardToolResponse(
+            status="success",
+            tool_name=tool_name,
+            data={},
+            summary=f"{tool_name} completed successfully"
+        )
+        
+        return StandardWebSocketMessage(
+            type="tool_completed",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step=f"Completed {tool_name.replace('_', ' ').title()}",
+                step_number=turn,
+                total_steps=self.total_steps
+            ),
+            tool=ToolInfo(name=tool_name, status="completed", result=mock_result)
+        )
+
+    def _handle_completion_update(self, task_id: str, update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Handle completion-type updates."""
+        execution_summary = update.data.get("tool_results", {}) if update.data else {}
+        logger.info(f"Analysis received {len(execution_summary)} tool results: {list(execution_summary.keys())}")
+        
+        summary = self._generate_summary(execution_summary, self.user_prompt)
+        total_turns = (update.metadata.total_turns or 0) if update.metadata else 0
+        
+        return StandardWebSocketMessage(
+            type="analysis_completed",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=100,
+                current_step="Analysis Complete",
+                step_number=total_turns,
+                total_steps=self.total_steps
+            ),
+            results=AnalysisResults(
+                summary=summary,
+                execution_info={
+                    "user_prompt": self.user_prompt,
+                    "total_tools_executed": len(execution_summary),
+                    "tools_used": list(execution_summary.keys()),
+                    "timestamp": self.start_time.isoformat() if self.start_time else datetime.now().isoformat()
+                },
+            ),
+            ai_message=update.message
+        )
+
+    def _handle_error_update(self, task_id: str, update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Handle error-type updates."""
+        error_details = update.data.get("error_details") if update.data else None
+        
+        return StandardWebSocketMessage(
+            type="analysis_error",
+            task_id=task_id,
+            error=StandardError(
+                message=str(update.message),
+                details=error_details,
+                error_type="orchestration_error"
+            )
+        )
+
+    def _handle_default_update(self, task_id: str, update: OrchestratorUpdate) -> StandardWebSocketMessage:
+        """Handle unknown update types with default progress message."""
+        turn = (update.metadata.turn or 0) if update.metadata else 0
+        return StandardWebSocketMessage(
+            type="progress",
+            task_id=task_id,
+            progress=ProgressInfo(
+                percentage=self._estimate_progress(update),
+                current_step="Processing...",
+                step_number=turn,
+                total_steps=self.total_steps
+            ),
+            ai_message=update.message
+        )
+ 
+    def _estimate_progress(self, update: OrchestratorUpdate) -> int:
+        """Estimate progress percentage based on the orchestration state."""
+        update_type = update.type
+        
+        turn = (update.metadata.turn or 0) if update.metadata else 0
+        tools_executed = (update.metadata.tools_executed or 0) if update.metadata else 0
+        
+        base_progress = min((turn * 8) + (tools_executed * 10), 90)
+        
+        if update_type == "tool_completed":
+            base_progress += 5
+        elif update_type == "completed":
+            return 100
+        
+        return min(base_progress, 95)
+ 
+    def _generate_summary(self, tool_results: Dict[str, Any], user_prompt: str) -> str:
+        """Generate summary of tool results"""
+
+        summary_prompt = f"""
+        Based on the following analysis results, generate a comprehensive summary:
+        
+        User Request: {user_prompt}        
+        Tool Results: {tool_results}       
+        """
+
+        response = self.llm.invoke([HumanMessage(content=summary_prompt)])
+        return response.content
     
-    async def _run_smart_analysis(
-        self,
-        task_id: str,
-        repository_url: str, 
-        context: str,
-        intent: Optional[str] = None,
-        target_languages: Optional[list] = None,
-        scope: str = "full",
-        depth: str = "comprehensive",
-        additional_params: Optional[Dict] = None
-    ):
-        """Legacy method to run smart analysis using SmartAnalysisAgent."""
-        try:
-            # Send initial confirmation
-            await self.send_message(task_id, {
-                "type": "smart_task.started",
-                "task_id": task_id,
-                "status": "running",
-                "repository_url": repository_url,
-                "context": context,
-                "intent": intent,
-                "scope": scope,
-                "depth": depth
-            })
-            
-            # Build additional parameters
-            if additional_params is None:
-                additional_params = {}
-            
-            if intent:
-                additional_params["intent"] = intent
-            if target_languages:
-                additional_params["target_languages"] = target_languages
-            if scope:
-                additional_params["scope"] = scope
-            if depth:
-                additional_params["depth"] = depth
-            
-            # Run smart analysis with real-time updates
-            async for update in self.smart_agent.analyze_repository(
-                repository_url, context, additional_params
-            ):
-                # Forward all updates to the client
-                update["task_id"] = task_id
-                await self.send_message(task_id, update)
-                
-                # Break on completion or error
-                if update["type"] in ["completed", "error"]:
-                    break
-        
-        except Exception as e:
-            logger.error(f"Smart analysis failed for task {task_id}: {e}")
-            await self.send_message(task_id, {
-                "type": "task.error",
-                "task_id": task_id,
-                "error": f"Smart analysis failed: {str(e)}"
-            })
-    
-    async def _run_ai_smart_analysis(
-        self,
-        task_id: str,
-        repository_url: str, 
-        context: str,
-        intent: Optional[str] = None,
-        target_languages: Optional[list] = None,
-        scope: str = "full",
-        depth: str = "comprehensive",
-        additional_params: Optional[Dict] = None
-    ):
-        """New method to run AI-driven smart analysis using SmartAgent with tool orchestration."""
-        try:
-            # Send initial confirmation
-            await self.send_message(task_id, {
-                "type": "ai_smart_task.started",
-                "task_id": task_id,
-                "status": "running",
-                "repository_url": repository_url,
-                "context": context,
-                "intent": intent,
-                "scope": scope,
-                "depth": depth,
-                "analysis_mode": "ai_orchestrated"
-            })
-            
-            # Run AI-driven smart analysis with real-time updates
-            async for update in self.ai_smart_agent.analyze_repository(repository_url, context):
-                # Forward all updates to the client with task_id
-                update["task_id"] = task_id
-                await self.send_message(task_id, update)
-                
-                # Break on completion or error
-                if update["type"] in ["completed", "error"]:
-                    break
-        
-        except Exception as e:
-            logger.error(f"AI-driven smart analysis failed for task {task_id}: {e}")
-            await self.send_message(task_id, {
-                "type": "task.error",
-                "task_id": task_id,
-                "error": f"AI-driven smart analysis failed: {str(e)}",
-                "context": "ai_smart_analysis"
-            })
-    
-    async def _run_simple_ai_analysis(self, task_id: str, repository_url: str, prompt: str):
-        """Run simplified AI-driven analysis using just a user prompt."""
-        try:
-            # Send initial confirmation with simplified format
-            await self.send_message(task_id, {
-                "type": "ai_analysis.started",
-                "task_id": task_id,
-                "status": "running",
-                "repository_url": repository_url,
-                "prompt": prompt,
-                "message": "AI is analyzing your repository based on your prompt..."
-            })
-            
-            logger.info(f"Starting simplified AI analysis for task {task_id}")
-            logger.info(f"Repository: {repository_url}")
-            logger.info(f"User prompt: {prompt}")
-            
-            # Run AI-driven analysis with the prompt as context
-            async for update in self.ai_smart_agent.analyze_repository(repository_url, prompt):
-                # Forward all updates to the client with task_id
-                update["task_id"] = task_id
-                await self.send_message(task_id, update)
-                
-                # Break on completion or error
-                if update["type"] in ["completed", "error"]:
-                    logger.info(f"AI analysis task {task_id} finished with type: {update['type']}")
-                    break
-        
-        except Exception as e:
-            logger.error(f"Simplified AI analysis failed for task {task_id}: {e}")
-            await self.send_message(task_id, {
-                "type": "task.error",
-                "task_id": task_id,
-                "error": f"AI analysis failed: {str(e)}",
-                "context": "simple_ai_analysis"
-            })
-    
-    def _generate_summary(self, results: Dict[str, Any]) -> str:
-        """Generate a summary from the analysis results."""
-        lang_analysis = results.get("language_analysis", {})
-        file_structure = results.get("file_structure", {})
-        patterns = results.get("architecture_patterns", [])
-        
-        primary_lang = lang_analysis.get("primary_language", "Unknown")
-        total_files = file_structure.get("total_files", 0)
-        total_lines = file_structure.get("total_lines", 0)
-        
-        summary = f"Analysis complete for {primary_lang} project with {total_files} files ({total_lines:,} lines of code)"
-        
-        if patterns:
-            summary += f". Detected architectural patterns: {', '.join(patterns[:3])}"
-        
-        return summary
-    
-    def _generate_statistics(self, results: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate statistics from the analysis results."""
-        lang_analysis = results.get("language_analysis", {})
-        file_structure = results.get("file_structure", {})
-        components = results.get("main_components", [])
-        patterns = results.get("architecture_patterns", [])
-        dependencies = results.get("dependencies", {})
-        
-        return {
-            "Files Analyzed": file_structure.get("total_files", 0),
-            "Lines of Code": file_structure.get("total_lines", 0),
-            "Languages Detected": len(lang_analysis.get("languages", {})),
-            "Main Components": len(components),
-            "Architecture Patterns": len(patterns),
-            "Dependency Groups": len(dependencies)
-        }
-    
-    def get_task_status(self, task_id: str) -> Dict[str, Any]:
-        """Get the status of a specific task."""
-        if task_id in self.active_connections:
-            return {"task_id": task_id, "status": "running"}
-        elif task_id in self.active_tasks:
-            return {"task_id": task_id, "status": "processing"}
-        else:
-            return {"task_id": task_id, "status": "not_found"}
-    
-    def get_active_connections_info(self) -> Dict[str, Any]:
-        """Get information about active connections."""
-        return {
-            "active_connections": len(self.active_connections),
-            "active_tasks": len(self.active_tasks),
-            "connection_ids": list(self.active_connections.keys())
-        }
-    
-    async def get_tool_registry_info(self) -> Dict[str, Any]:
-        """Get information about the tool registry."""
-        await self.initialize()
-        
-        try:
-            registry = await get_tool_registry()
-            return registry.get_registry_info()
-        except Exception as e:
-            logger.error(f"Failed to get tool registry info: {e}")
-            return {
-                "total_tools": 0,
-                "healthy_tools": 0,
-                "capabilities": [],
-                "supported_languages": [],
-                "tools": {},
-                "error": str(e)
-            } 
+analysis_service = AnalysisService()

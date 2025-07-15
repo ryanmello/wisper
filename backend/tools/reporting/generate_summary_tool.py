@@ -1,289 +1,294 @@
-"""
-Generate Summary Tool - Create AI-powered comprehensive summaries from analysis results
-"""
-
 import json
+import time
 from typing import Dict, Any
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-
 from utils.logging_config import get_logger
 from config.settings import settings
+from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 
 logger = get_logger(__name__)
 
 @tool
-def generate_summary(analysis_results: Dict[str, Any], user_context: str) -> Dict[str, Any]:
+def generate_summary(tool_results: Any) -> StandardToolResponse:
     """Generate AI-powered summary from analysis results to provide comprehensive insights and recommendations.
     
     This tool takes the results from multiple analysis tools and creates a cohesive, intelligent summary 
-    that synthesizes findings into actionable insights. It's particularly useful for complex analyses where 
-    multiple tools have been used, as it can identify patterns and connections across different analysis results.
-    
-    Prerequisites: One or more analysis tools should have been run to provide analysis_results
-    Best used: As a final step to synthesize and summarize findings from multiple analysis tools
+    that synthesizes findings into actionable insights.
     
     Args:
-        analysis_results: Dictionary containing results from previously executed analysis tools
-        user_context: Original user request context for tailored summary generation
+        tool_results: Results from previously executed analysis tools containing repository analysis data.
         
     Returns:
-        Dictionary with AI-generated summary, key insights, and recommendations
+        StandardToolResponse with AI-generated summary, key insights, and recommendations
     """
+    start_time = time.time()
     logger.info("Generating AI-powered summary from analysis results")
     
     try:
-        # Initialize LLM if OpenAI API key is available
+        # Check if OpenAI API key is available
         if not settings.OPENAI_API_KEY:
             logger.warning("No OpenAI API key available - generating basic summary")
-            return _generate_basic_summary(analysis_results)
+            return _generate_basic_fallback(tool_results, start_time)
         
+        # Initialize LLM
         llm = ChatOpenAI(
             model="gpt-4",
-            temperature=0.3,
+            temperature=0.2,
             api_key=settings.OPENAI_API_KEY
         )
         
-        # Prepare analysis data for AI
-        prepared_data = _prepare_analysis_data(analysis_results)
+        # Create system prompt
+        system_prompt = SystemMessage(content=_get_system_prompt())
         
-        # Create AI prompt
-        system_prompt = SystemMessage(content="""
-You are an expert code analysis assistant. Analyze the provided repository analysis results and create a comprehensive, actionable summary.
-
-Focus on:
-1. Overall architecture and code quality
-2. Security findings and recommendations  
-3. Key technologies and dependencies
-4. Main strengths and areas for improvement
-5. Actionable next steps
-
-Provide insights that would be valuable to developers, architects, and security teams.
-Structure your response as a professional analysis report.
-""")
-        
+        # Create human prompt with tool results
         human_prompt = HumanMessage(content=f"""
-Please analyze these repository analysis results and provide a comprehensive summary:
+        Analyze the following repository analysis results and provide a comprehensive summary:
 
-{json.dumps(prepared_data, indent=2)}
+        {json.dumps(tool_results, indent=2, default=str)}
 
-Provide a structured analysis with clear insights and recommendations.
-""")
-        
+        Respond with a valid JSON object matching the schema provided in the system prompt.
+        """)
+                
         # Generate AI summary
+        logger.info("Sending analysis request to AI")
         response = llm.invoke([system_prompt, human_prompt])
-        ai_summary = response.content
         
-        # Extract key metrics
-        metrics = _extract_key_metrics(analysis_results)
+        # Parse and validate response
+        summary_data = _parse_ai_response(response.content)
         
-        # Generate actionable recommendations
-        recommendations = _generate_recommendations(analysis_results)
+        # Calculate execution time
+        execution_time_ms = int((time.time() - start_time) * 1000)
         
-        result = {
-            "ai_summary": ai_summary,
-            "key_metrics": metrics,
-            "recommendations": recommendations,
-            "analysis_timestamp": _get_timestamp(),
-            "summary_type": "ai_powered"
-        }
+        # Create StandardToolResponse
+        result = StandardToolResponse(
+            status="success",
+            tool_name="generate_summary",
+            data=summary_data,
+            summary=summary_data.get("executive_summary", "AI-powered analysis summary generated"),
+            metrics=StandardMetrics(
+                items_processed=_count_tool_results(tool_results),
+                execution_time_ms=execution_time_ms
+            )
+        )
         
         logger.info("AI-powered summary generated successfully")
         return result
         
     except Exception as e:
+        execution_time_ms = int((time.time() - start_time) * 1000)
         logger.error(f"Failed to generate AI summary: {e}")
         logger.info("Falling back to basic summary")
-        return _generate_basic_summary(analysis_results)
+        return _generate_basic_fallback(tool_results, start_time, error=str(e))
 
-def _prepare_analysis_data(results: Dict[str, Any]) -> Dict[str, Any]:
-    """Prepare analysis data for AI consumption, filtering out noise."""
-    prepared = {}
-    
-    # File structure summary
-    if "file_structure" in results:
-        fs = results["file_structure"]
-        prepared["file_structure"] = {
-            "total_files": fs.get("total_files", 0),
-            "total_lines": fs.get("total_lines", 0),
-            "main_file_types": dict(list(fs.get("file_types", {}).items())[:10]),
-            "main_directories": fs.get("main_directories", [])[:10]
-        }
-    
-    # Language analysis
-    if "language_analysis" in results:
-        lang = results["language_analysis"]
-        prepared["languages"] = {
-            "primary": lang.get("primary_language", "Unknown"),
-            "all_languages": lang.get("languages", {}),
-            "frameworks": lang.get("frameworks", [])
-        }
-    
-    # Architecture patterns
-    if "architectural_patterns" in results:
-        prepared["architecture"] = {
-            "patterns": results["architectural_patterns"],
-            "components": results.get("main_components", [])[:5]  # Top 5 components
-        }
-    
-    # Dependencies
-    if "dependencies_by_language" in results:
-        prepared["dependencies"] = results["dependencies_by_language"]
-    
-    # Security findings
-    if "security_issues" in results:
-        prepared["security"] = {
-            "total_issues": len(results["security_issues"]),
-            "risk_level": results.get("risk_level", "unknown"),
-            "issue_summary": _summarize_security_issues(results["security_issues"])
-        }
-    
-    # Vulnerability scan results
-    if "vulnerabilities_found" in results:
-        prepared["vulnerabilities"] = {
-            "count": results["vulnerabilities_found"],
-            "status": results.get("status", "unknown")
-        }
-    
-    return prepared
+def _get_system_prompt() -> str:
+    """Get the system prompt with expected response structure"""
+    return """You are an expert code analysis assistant. Analyze repository analysis results and create a comprehensive, actionable summary.
 
-def _summarize_security_issues(issues: list) -> Dict[str, int]:
-    """Summarize security issues by type and severity."""
-    summary = {"by_severity": {"high": 0, "medium": 0, "low": 0}, "by_type": {}}
-    
-    for issue in issues:
-        severity = issue.get("severity", "low")
-        issue_type = issue.get("type", "unknown")
+    Your analysis should focus on:
+    - Overall code quality and architecture
+    - Security findings and risk assessment
+    - Key technologies and dependencies
+    - Actionable recommendations with clear priorities
+    - Technical metrics and insights
+
+    CRITICAL: You must respond with a valid JSON object that exactly matches this structure:
+
+    {
+    "executive_summary": "High-level summary for stakeholders (2-3 sentences)",
+    "key_findings": ["Most important discovery 1", "Key finding 2", "..."],
+    "technical_metrics": {
+        "languages_count": 0,
+        "total_files": 0,
+        "lines_of_code": 0,
+        "dependencies_count": 0,
+        "architecture_patterns": ["pattern1", "pattern2"]
+    },
+    "security_assessment": {
+        "risk_level": "low|medium|high|critical",
+        "total_issues": 0,
+        "vulnerabilities": 0,
+        "critical_findings": ["Critical security issue 1", "..."]
+    },
+    "recommendations": [
+        {
+        "priority": "high|medium|low",
+        "action": "Specific action to take",
+        "rationale": "Why this matters",
+        "category": "security|architecture|dependencies|maintenance"
+        }
+    ],
+    "confidence_score": 0.9
+    }
+
+    Extract metrics from the provided data. If data is missing, use reasonable defaults (0 for counts, empty arrays for lists).
+    Focus on actionable insights that would help developers, architects, and security teams.
+
+    Respond ONLY with the JSON object - no additional text or explanation.
+    """
+
+def _parse_ai_response(response_content: str) -> Dict[str, Any]:
+    """Parse LLM response and do basic validation"""
+    try:
+        # Parse JSON response
+        response_data = json.loads(response_content)
         
-        summary["by_severity"][severity] = summary["by_severity"].get(severity, 0) + 1
-        summary["by_type"][issue_type] = summary["by_type"].get(issue_type, 0) + 1
+        # Basic validation - ensure required fields exist with defaults
+        required_structure = {
+            "executive_summary": "Repository analysis completed with AI-powered insights.",
+            "key_findings": [],
+            "technical_metrics": {
+                "languages_count": 0,
+                "total_files": 0,
+                "lines_of_code": 0,
+                "dependencies_count": 0,
+                "architecture_patterns": []
+            },
+            "security_assessment": {
+                "risk_level": "unknown",
+                "total_issues": 0,
+                "vulnerabilities": 0,
+                "critical_findings": []
+            },
+            "recommendations": [],
+            "confidence_score": 0.8
+        }
+        
+        # Merge with defaults for any missing fields
+        for key, default_value in required_structure.items():
+            if key not in response_data:
+                response_data[key] = default_value
+            elif isinstance(default_value, dict) and isinstance(response_data[key], dict):
+                # Merge nested dict defaults
+                for nested_key, nested_default in default_value.items():
+                    if nested_key not in response_data[key]:
+                        response_data[key][nested_key] = nested_default
+        
+        return response_data
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise ValueError(f"Invalid JSON response from AI: {e}")
     
-    return summary
+    except Exception as e:
+        logger.error(f"Response validation failed: {e}")
+        raise ValueError(f"Response validation error: {e}")
 
-def _extract_key_metrics(results: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract key quantitative metrics from analysis results."""
-    metrics = {}
+def _generate_basic_fallback(tool_results: Any, start_time: float, error: str = None) -> StandardToolResponse:
+    """Generate basic summary when AI is not available"""
+    logger.info("Generating basic fallback summary")
     
-    # Code metrics
-    if "file_structure" in results:
-        fs = results["file_structure"]
-        metrics["code_files"] = fs.get("total_files", 0)
-        metrics["lines_of_code"] = fs.get("total_lines", 0)
+    # Extract basic metrics from tool results
+    metrics = _extract_basic_metrics(tool_results)
     
-    # Language diversity
-    if "language_analysis" in results:
-        lang = results["language_analysis"]
-        metrics["languages_count"] = len(lang.get("languages", {}))
-        metrics["frameworks_count"] = len(lang.get("frameworks", []))
+    # Calculate execution time
+    execution_time_ms = int((time.time() - start_time) * 1000)
     
-    # Dependency metrics
-    if "dependencies_by_language" in results:
-        deps = results["dependencies_by_language"]
-        metrics["total_dependencies"] = sum(len(d) for d in deps.values())
-        metrics["dependency_ecosystems"] = len(deps)
+    summary_data = {
+        "executive_summary": f"Repository analysis completed for codebase with {metrics['total_files']} files and {metrics['languages_count']} programming languages.",
+        "key_findings": [
+            f"Primary language: {metrics.get('primary_language', 'Unknown')}",
+            f"Total dependencies: {metrics['dependencies_count']}",
+            f"Security issues: {metrics['security_issues']}"
+        ],
+        "technical_metrics": {
+            "languages_count": metrics["languages_count"],
+            "total_files": metrics["total_files"],
+            "lines_of_code": metrics["lines_of_code"],
+            "dependencies_count": metrics["dependencies_count"],
+            "architecture_patterns": metrics.get("architecture_patterns", [])
+        },
+        "security_assessment": {
+            "risk_level": metrics.get("risk_level", "unknown"),
+            "total_issues": metrics["security_issues"],
+            "vulnerabilities": metrics["vulnerabilities"],
+            "critical_findings": ["Analysis requires AI for detailed security assessment"]
+        },
+        "recommendations": [
+            {
+                "priority": "medium",
+                "action": "Review security findings",
+                "rationale": "Security issues detected that require attention",
+                "category": "security"
+            }
+        ],
+        "confidence_score": 0.5
+    }
     
-    # Security metrics
-    if "security_issues" in results:
-        metrics["security_issues"] = len(results["security_issues"])
-        metrics["risk_level"] = results.get("risk_level", "unknown")
+    # Determine status and error handling
+    status = "error" if error else "partial_success"
+    error_info = StandardError(
+        message=f"AI summary generation failed: {error}",
+        details="Fell back to basic summary generation",
+        error_type="ai_generation_error"
+    ) if error else None
     
-    if "vulnerabilities_found" in results:
-        metrics["vulnerabilities"] = results["vulnerabilities_found"]
+    return StandardToolResponse(
+        status=status,
+        tool_name="generate_summary",
+        data=summary_data,
+        summary="Basic summary generated (AI unavailable)" if not error else "Summary generation failed - basic fallback provided",
+        metrics=StandardMetrics(
+            items_processed=_count_tool_results(tool_results),
+            execution_time_ms=execution_time_ms
+        ),
+        warnings=["AI-powered analysis unavailable - basic summary provided"] if not error else None,
+        error=error_info
+    )
+
+def _extract_basic_metrics(tool_results: Any) -> Dict[str, Any]:
+    """Extract basic metrics from tool results for fallback"""
+    metrics = {
+        "languages_count": 0,
+        "total_files": 0,
+        "lines_of_code": 0,
+        "dependencies_count": 0,
+        "security_issues": 0,
+        "vulnerabilities": 0
+    }
     
-    # Architecture complexity
-    if "architectural_patterns" in results:
-        metrics["architecture_patterns"] = len(results["architectural_patterns"])
+    if not isinstance(tool_results, dict):
+        return metrics
     
-    if "main_components" in results:
-        metrics["main_components"] = len(results["main_components"])
+    # Extract from explore_codebase
+    if "explore_codebase" in tool_results:
+        explore_data = tool_results["explore_codebase"]
+        if isinstance(explore_data, dict):
+            # Language data
+            lang_analysis = explore_data.get("language_analysis", {})
+            if isinstance(lang_analysis, dict):
+                metrics["languages_count"] = len(lang_analysis.get("languages", {}))
+                metrics["primary_language"] = lang_analysis.get("primary_language", "Unknown")
+            
+            # File structure data
+            file_structure = explore_data.get("file_structure", {})
+            if isinstance(file_structure, dict):
+                metrics["total_files"] = file_structure.get("total_files", 0)
+                metrics["lines_of_code"] = file_structure.get("total_lines", 0)
+            
+            # Architecture patterns
+            metrics["architecture_patterns"] = explore_data.get("architectural_patterns", [])
+    
+    # Extract from analyze_dependencies
+    if "analyze_dependencies" in tool_results:
+        dep_data = tool_results["analyze_dependencies"]
+        if isinstance(dep_data, dict):
+            deps_by_lang = dep_data.get("dependencies_by_language", {})
+            if isinstance(deps_by_lang, dict):
+                metrics["dependencies_count"] = sum(len(deps) if isinstance(deps, list) else 0 
+                                                   for deps in deps_by_lang.values())
+    
+    # Extract from scan_go_vulnerabilities
+    if "scan_go_vulnerabilities" in tool_results:
+        vuln_data = tool_results["scan_go_vulnerabilities"]
+        if isinstance(vuln_data, dict):
+            metrics["vulnerabilities"] = vuln_data.get("vulnerabilities_found", 0)
     
     return metrics
 
-def _generate_recommendations(results: Dict[str, Any]) -> list:
-    """Generate actionable recommendations based on analysis results."""
-    recommendations = []
-    
-    # Security recommendations
-    if "security_issues" in results and results["security_issues"]:
-        recommendations.append("Address identified security issues to improve code safety")
-    
-    if "vulnerabilities_found" in results and results["vulnerabilities_found"] > 0:
-        recommendations.append("Update dependencies to fix security vulnerabilities")
-    
-    # Architecture recommendations
-    if "architectural_patterns" in results:
-        patterns = results["architectural_patterns"]
-        if not patterns:
-            recommendations.append("Consider implementing clear architectural patterns for better maintainability")
-        elif len(patterns) > 5:
-            recommendations.append("Review architectural complexity - multiple patterns detected")
-    
-    # Dependency recommendations
-    if "dependencies_by_language" in results:
-        deps = results["dependencies_by_language"]
-        total_deps = sum(len(d) for d in deps.values())
-        if total_deps > 50:
-            recommendations.append("Consider dependency audit - high number of dependencies detected")
-    
-    # Code organization recommendations
-    if "file_structure" in results:
-        fs = results["file_structure"]
-        if fs.get("total_files", 0) > 1000:
-            recommendations.append("Consider modularization strategies for large codebase")
-    
-    # Default recommendations
-    if not recommendations:
-        recommendations.append("Codebase appears well-structured - continue following best practices")
-    
-    return recommendations
-
-def _generate_basic_summary(results: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate basic summary without AI when OpenAI is not available."""
-    summary_parts = []
-    
-    # File structure summary
-    if "file_structure" in results:
-        fs = results["file_structure"]
-        summary_parts.append(f"Repository contains {fs.get('total_files', 0)} files with {fs.get('total_lines', 0)} lines of code.")
-    
-    # Language summary
-    if "language_analysis" in results:
-        lang = results["language_analysis"]
-        primary = lang.get("primary_language", "Unknown")
-        frameworks = lang.get("frameworks", [])
-        summary_parts.append(f"Primary language: {primary}.")
-        if frameworks:
-            framework_names = [f["name"] for f in frameworks]
-            summary_parts.append(f"Detected frameworks: {', '.join(framework_names)}.")
-    
-    # Security summary
-    if "security_issues" in results:
-        issues = results["security_issues"]
-        if issues:
-            summary_parts.append(f"Found {len(issues)} security issues requiring attention.")
-        else:
-            summary_parts.append("No major security issues detected.")
-    
-    # Vulnerability summary
-    if "vulnerabilities_found" in results:
-        vulns = results["vulnerabilities_found"]
-        if vulns > 0:
-            summary_parts.append(f"Found {vulns} security vulnerabilities in dependencies.")
-        else:
-            summary_parts.append("No vulnerabilities found in dependencies.")
-    
-    basic_summary = " ".join(summary_parts)
-    
-    return {
-        "ai_summary": basic_summary,
-        "key_metrics": _extract_key_metrics(results),
-        "recommendations": _generate_recommendations(results),
-        "analysis_timestamp": _get_timestamp(),
-        "summary_type": "basic"
-    }
-
-def _get_timestamp() -> str:
-    """Get current timestamp for the summary."""
-    from datetime import datetime
-    return datetime.now().isoformat() 
+def _count_tool_results(tool_results: Any) -> int:
+    """Count number of tool results processed"""
+    if isinstance(tool_results, dict):
+        return len(tool_results)
+    return 1 if tool_results else 0 

@@ -9,7 +9,7 @@ def main():
     print(f"   Host: {settings.HOST}")
     print(f"   Port: {settings.PORT}")
     print(f"   Reload: {settings.RELOAD}")
-    print(f"   OpenAI API Key: {'✅ Set' if settings.OPENAI_API_KEY else '❌ Missing'}")
+    print(f"   OpenAI API Key: {'Set' if settings.OPENAI_API_KEY else 'Missing'}")
     print(f"   Frontend URL: {settings.FRONTEND_URL}")
     print(f"   API Docs: http://{settings.HOST}:{settings.PORT}/docs")
     

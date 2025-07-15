@@ -1,1 +1,0 @@
-# Security tools for vulnerability scanning and security auditing 

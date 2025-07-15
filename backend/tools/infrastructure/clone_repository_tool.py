@@ -1,20 +1,16 @@
-"""
-Clone Repository Tool - Clone Git repositories to local temporary storage
-"""
-
 import tempfile
-from typing import Dict, Any
 from langchain_core.tools import tool
 from git import Repo
 from pathlib import Path
-
 from config.settings import settings
 from utils.logging_config import get_logger
+from utils.response_builder import create_tool_response_builder
+from models.api_models import StandardToolResponse
 
 logger = get_logger(__name__)
 
 @tool
-def clone_repository(repository_url: str) -> Dict[str, Any]:
+def clone_repository(repository_url: str) -> StandardToolResponse:
     """Clone a Git repository to local temporary storage for analysis.
     
     This tool downloads the entire repository codebase to a temporary directory where it can be analyzed by other tools. 
@@ -28,9 +24,11 @@ def clone_repository(repository_url: str) -> Dict[str, Any]:
         repository_url: The GitHub repository URL to clone
         
     Returns:
-        Dictionary with clone_path, repository_name, branch, and metadata
+        StandardToolResponse with clone_path, repository_name, branch, and metadata
     """
+    response_builder = create_tool_response_builder("clone_repository")
     temp_dir = None
+    
     try:
         # Create temporary directory
         temp_dir = tempfile.mkdtemp(prefix=settings.TEMP_DIR_PREFIX)
@@ -39,24 +37,32 @@ def clone_repository(repository_url: str) -> Dict[str, Any]:
         # Clone repository
         repo = Repo.clone_from(repository_url, temp_dir)
         
-        result = {
-            "status": "success",
+        # Prepare successful response data
+        clone_data = {
             "clone_path": temp_dir,
             "repository_name": Path(repository_url).name.replace('.git', ''),
             "branch": repo.active_branch.name,
             "commit_count": len(list(repo.iter_commits())),
             "last_commit": repo.head.commit.hexsha[:8],
-            # Tool metadata for result compilation
-            "_tool_metadata": {
-                "category": "infrastructure",
-                "result_type": "setup",
-                "output_keys": ["clone_path", "repository_name", "branch"],
-                "priority": 1  # High priority for setup tools
-            }
+            "repository_url": repository_url
+        }
+        
+        # Generate summary
+        summary = f"Successfully cloned {clone_data['repository_name']} ({clone_data['commit_count']} commits) to temporary directory"
+        
+        # Create metrics
+        metrics = {
+            "items_processed": 1,  # One repository cloned
+            "files_analyzed": 0    # Will be updated by subsequent tools
         }
         
         logger.info(f"Successfully cloned repository to {temp_dir}")
-        return result
+        
+        return response_builder.build_success(
+            data=clone_data,
+            summary=summary,
+            metrics=metrics
+        )
         
     except Exception as e:
         logger.error(f"Failed to clone repository {repository_url}: {e}")
@@ -66,17 +72,18 @@ def clone_repository(repository_url: str) -> Dict[str, Any]:
             try:
                 import shutil
                 shutil.rmtree(temp_dir)
-            except:
-                pass
+                logger.info(f"Cleaned up failed clone directory: {temp_dir}")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to cleanup directory {temp_dir}: {cleanup_error}")
         
-        return {
-            "status": "error",
-            "error": str(e),
-            "clone_path": None,
-            "_tool_metadata": {
-                "category": "infrastructure",
-                "result_type": "setup",
-                "output_keys": [],
-                "priority": 1
+        # Return standardized error response
+        return response_builder.build_error(
+            error_message=f"Failed to clone repository: {str(e)}",
+            error_details=f"Repository URL: {repository_url}, Error: {str(e)}",
+            error_type="clone_failure",
+            data={
+                "repository_url": repository_url,
+                "clone_path": None,
+                "attempted_temp_dir": temp_dir
             }
-        } 
+        ) 

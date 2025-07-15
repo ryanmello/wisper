@@ -1,14 +1,14 @@
 import os
-import logging
 from typing import List, Optional
 from dotenv import load_dotenv
+from utils.logging_config import get_logger
 
 load_dotenv()
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class Settings:
-    PROJECT_NAME: str = "whisper"
+    PROJECT_NAME: str = "cipher"
     HOST: str = os.getenv("HOST", "127.0.0.1")
     PORT: int = int(os.getenv("PORT", "8000"))
     RELOAD: bool = os.getenv("RELOAD", "true").lower() == "true"
