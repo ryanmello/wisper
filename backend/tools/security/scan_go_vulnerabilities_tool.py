@@ -49,14 +49,14 @@ def scan_go_vulnerabilities(repository_path: str) -> str:
             timeout=120
         )
         
-        raw_output = scan_result.stdout
-        logger.info("Raw output: " + raw_output)
+        output = scan_result.stdout
+        logger.info("Output: " + output)
         
         if scan_result.returncode == 0:
             logger.info("govulncheck completed - no vulnerabilities found")
             return "Go Security Scan: No vulnerabilities found in Go dependencies. The project appears secure."
         else:
-            return raw_output
+            return output
                 
     except subprocess.TimeoutExpired:
         logger.warning("govulncheck scan timed out")

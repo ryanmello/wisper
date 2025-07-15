@@ -12,8 +12,8 @@ const Conscience = () => {
       <div className="flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
           <Fingerprint size={32} />
-          <Waypoints size={32} />
           <Flower size={32} />
+          <Waypoints size={32} />
           <Sparkles size={32} />
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">

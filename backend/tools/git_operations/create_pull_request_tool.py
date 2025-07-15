@@ -1,7 +1,6 @@
 import os
 import time
 from datetime import datetime
-from typing import Dict, Any
 from langchain_core.tools import tool
 from git import Repo
 from utils.logging_config import get_logger
@@ -111,7 +110,6 @@ def create_pull_request(repository_path: str, branch_name: str, title: str, desc
                 )
             )
         
-        # Create unique branch name with timestamp
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         unique_branch_name = f"{branch_name}-{timestamp}"
         logger.info(f"Using timestamped branch name: {unique_branch_name}")

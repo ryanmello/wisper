@@ -1,193 +1,129 @@
-"use client";
+'use client'
+import React, { useState, useEffect } from 'react'
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import Image from "next/image";
-import { Star, Flame, ShoppingCart } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useCart } from "@/context/cart-context";
-import { toast } from "sonner";
+interface PullRequest {
+  id: number
+  title: string
+  state: string
+  repository: {
+    name: string
+    full_name: string
+    owner: string
+  }
+  created_at: string
+  updated_at: string
+  html_url: string
+  user: {
+    login: string
+    avatar_url: string
+  }
+  comments: number
+}
 
-export const salsaProducts = [
-  {
-    id: 1,
-    name: "Sweet Potato BBQ Sauce",
-    brand: "Kyvan",
-    description:
-      "Rich and smoky BBQ sauce featuring roasted sweet potatoes for natural sweetness and depth. This unique blend combines traditional BBQ flavors with the earthy sweetness of sweet potato, creating a perfect balance for grilled meats and vegetables.",
-    price: 8.99,
-    originalPrice: 10.99,
-    image: "/kyvan/spbbq.png",
-    heatLevel: "Mild",
-    sizes: ["8oz", "16oz", "24oz"],
-    selectedSize: "16oz",
-    rating: 4.8,
-    reviews: 124,
-    featured: true,
-    servingSize: "2 Tbsp (30g)",
-  },
-  {
-    id: 2,
-    name: "Honey Apple BBQ Sauce",
-    brand: "Kyvan",
-    description:
-      "Sweet and tangy BBQ sauce infused with pure honey and crisp apple flavors. This delightful combination brings together the natural sweetness of honey with the fresh tartness of apples, creating a perfectly balanced sauce that's ideal for pork, chicken, and ribs.",
-    price: 10.99,
-    image: "/kyvan/habbq.png",
-    heatLevel: "Medium",
-    sizes: ["8oz", "12oz", "16oz"],
-    selectedSize: "12oz",
-    rating: 4.9,
-    reviews: 89,
-    featured: true,
-    servingSize: "2 Tbsp (30g)",
-  },
-  {
-    id: 3,
-    name: "Cherry Apple BBQ Sauce",
-    brand: "Kyvan",
-    description:
-      "Bold and fruity BBQ sauce featuring tart cherries and sweet apples in perfect harmony. This gourmet blend offers a sophisticated flavor profile with rich cherry notes and crisp apple undertones, making it exceptional for beef, pork, and grilled vegetables.",
-    price: 9.49,
-    image: "/kyvan/cabbq.png",
-    heatLevel: "Hot",
-    sizes: ["8oz", "12oz", "16oz"],
-    selectedSize: "16oz",
-    rating: 4.7,
-    reviews: 67,
-    servingSize: "2 Tbsp (30g)",
-  },
-];
+export default function Veda() {
+  const [pullRequests, setPullRequests] = useState<PullRequest[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-export const renderStars = (rating: number) => {
-  const fullStars = Math.floor(rating);
-  const partialStar = rating - fullStars;
+  useEffect(() => {
+    fetchPullRequests()
+  }, [])
+
+  const fetchPullRequests = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('http://localhost:8000/pullrequests?state=all&repo_owner=ryanmello&repo_name=toodeloo')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setPullRequests(data.items || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      console.error('Error fetching pull requests:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-4">Veda - Pull Requests</h1>
+        <div>Loading pull requests...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <h1 className="text-2xl font-bold mb-4">Veda - Pull Requests</h1>
+        <div className="text-red-600">Error: {error}</div>
+        <button 
+          onClick={fetchPullRequests}
+          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex items-center gap-1">
-      {[...Array(5)].map((_, index) => {
-        if (index < fullStars) {
-          // Full star
-          return (
-            <Star
-              key={index}
-              className="h-3 w-3 text-yellow-400 fill-yellow-400"
-            />
-          );
-        } else if (index === fullStars && partialStar > 0) {
-          // Partial star
-          return (
-            <div key={index} className="relative h-3 w-3">
-              <Star className="h-3 w-3 text-gray-300 absolute" />
-              <div
-                className="overflow-hidden absolute"
-                style={{ width: `${partialStar * 100}%` }}
-              >
-                <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Veda - Pull Requests</h1>
+      
+      <div className="mb-4">
+        <p className="text-gray-600">Found {pullRequests.length} pull requests</p>
+      </div>
+
+      {pullRequests.length === 0 ? (
+        <div className="text-gray-500">No pull requests found.</div>
+      ) : (
+        <div className="space-y-4">
+          {pullRequests.map((pr) => (
+            <div key={pr.id} className="border rounded-lg p-4 bg-white shadow">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg text-blue-600">
+                    <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
+                      {pr.title}
+                    </a>
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {pr.repository.full_name} • #{pr.id}
+                  </p>
+                  <div className="flex items-center mt-2 space-x-4">
+                    <span className={`px-2 py-1 text-xs rounded ${
+                      pr.state === 'open' 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {pr.state}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {pr.comments} comments
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      Updated: {new Date(pr.updated_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <img 
+                    src={pr.user.avatar_url} 
+                    alt={pr.user.login}
+                    className="w-8 h-8 rounded-full"
+                  />
+                </div>
               </div>
             </div>
-          );
-        } else {
-          // Empty star
-          return <Star key={index} className="h-3 w-3 text-gray-300" />;
-        }
-      })}
-    </div>
-  );
-};
-
-export const getHeatLevelColor = (heatLevel: string) => {
-  switch (heatLevel.toLowerCase()) {
-    case "mild":
-      return "bg-green-100 text-green-800 border-green-200";
-    case "medium":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
-    case "hot":
-      return "bg-red-100 text-red-800 border-red-200";
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
-  }
-};
-
-export default function SalsaShop() {
-  const router = useRouter();
-  return (
-    <div className="min-h-screen">
-      {/* Products Grid */}
-      <section className="bg-white">
-        <div className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {salsaProducts.map((product) => (
-              <Card
-                key={product.id}
-                className="group overflow-hidden hover:shadow-lg transition-all duration-300 border border-neutral-200 bg-white py-0 cursor-pointer"
-                onClick={() => router.push(`/veda/${product.id}`)}
-              >
-                <CardHeader className="p-0 relative">
-                  <div className="aspect-square bg-gradient-to-br from-neutral-100 to-neutral-50 relative overflow-hidden">
-                    <Image
-                      src={product.image}
-                      alt={product.name}
-                      fill
-                      className="object-contain p-8 group-hover:scale-115 transition-transform duration-300"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="text-center">
-                      <h3 className="font-bold text-lg text-neutral-900 leading-tight mb-2">
-                        {product.name}
-                      </h3>
-                      <div className="flex items-center justify-center gap-2 mb-2">
-                        <span className="text-xl font-bold text-neutral-900">
-                          ${product.price}
-                        </span>
-                        {product.originalPrice && (
-                          <span className="text-sm text-neutral-500 line-through">
-                            ${product.originalPrice}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-2">
-                      {renderStars(product.rating)}
-                      <span className="text-xs text-neutral-600">
-                        ({product.reviews})
-                      </span>
-                    </div>
-
-                    <div className="flex justify-center">
-                      <Badge
-                        variant="outline"
-                        className={`${getHeatLevelColor(
-                          product.heatLevel
-                        )} border text-xs`}
-                      >
-                        <Flame className="h-3 w-3 mr-1" />
-                        {product.heatLevel}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3">
-                      <p className="text-xs text-neutral-500 text-center">
-                        Available in {product.sizes.length} size
-                        {product.sizes.length > 1 ? "s" : ""}:{" "}
-                        {product.sizes.join(", ")}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          ))}
         </div>
-      </section>
+      )}
     </div>
-  );
+  )
 }

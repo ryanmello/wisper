@@ -1,7 +1,3 @@
-"""
-Explore Codebase Tool - Comprehensive codebase analysis and exploration
-"""
-
 import os
 import json
 import time

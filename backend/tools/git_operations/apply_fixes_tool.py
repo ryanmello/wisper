@@ -1,12 +1,8 @@
-"""
-Apply Fixes Tool - Apply file changes to repository using AI analysis
-"""
-
 import os
 import re
 import time
 import json
-from typing import Dict, Any, List
+from typing import Dict
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.async_tool_decorator import async_tool
 from utils.logging_config import get_logger
@@ -42,7 +38,7 @@ async def apply_fixes(repository_path: str, changes: str) -> StandardToolRespons
     logger.info(f"Applying changes to repository: {repository_path}")
     
     try:
-        # Check if input is raw govulncheck output
+        # Check if input is govulncheck output
         if isinstance(changes, str) and _is_govulncheck_output(changes):
             logger.info("Detected govulncheck output, using AI analysis to generate fixes...")
             return await _handle_go_vulnerabilities_with_ai(repository_path, changes, start_time)
@@ -320,67 +316,67 @@ async def _send_to_ai(govulncheck_output: str, file_contents: Dict[str, str]) ->
     
     system_prompt = """You are a Go security expert specializing in fixing vulnerabilities.
 
-Your task is to analyze govulncheck output and fix the identified vulnerabilities by updating the necessary files.
+    Your task is to analyze govulncheck output and fix the identified vulnerabilities by updating the necessary files.
 
-IMPORTANT RULES:
-1. Focus on dependency updates in go.mod when possible (safest approach)
-2. Only modify source code if absolutely necessary for the fix
-3. Provide the complete updated file content for each file you modify
-4. Explain your reasoning for each change
-5. Be conservative - prefer minimal changes that fix the vulnerability
-6. If some vulnerabilities cannot be safely fixed, explain why
+    IMPORTANT RULES:
+    1. Focus on dependency updates in go.mod when possible (safest approach)
+    2. Only modify source code if absolutely necessary for the fix
+    3. Provide the complete updated file content for each file you modify
+    4. Explain your reasoning for each change
+    5. Be conservative - prefer minimal changes that fix the vulnerability
+    6. If some vulnerabilities cannot be safely fixed, explain why
 
-You can fix these types of vulnerabilities:
+    You can fix these types of vulnerabilities:
 
-1. **STANDARD LIBRARY vulnerabilities** (syscall, crypto/x509, net/http, etc.):
-   - Fix by updating the Go version in go.mod (e.g., "go 1.24.4")
-   - Example: syscall@go1.24.2 → Fixed in: syscall@go1.24.4 means update to "go 1.24.4"
+    1. **STANDARD LIBRARY vulnerabilities** (syscall, crypto/x509, net/http, etc.):
+    - Fix by updating the Go version in go.mod (e.g., "go 1.24.4")
+    - Example: syscall@go1.24.2 → Fixed in: syscall@go1.24.4 means update to "go 1.24.4"
 
-2. **MODULE DEPENDENCY vulnerabilities** (golang.org/x/net, etc.):
-   - Fix by updating dependency versions in the require section
-   - Example: golang.org/x/net@v0.34.0 → Fixed in: v0.38.0 means update to "golang.org/x/net v0.38.0"
+    2. **MODULE DEPENDENCY vulnerabilities** (golang.org/x/net, etc.):
+    - Fix by updating dependency versions in the require section
+    - Example: golang.org/x/net@v0.34.0 → Fixed in: v0.38.0 means update to "golang.org/x/net v0.38.0"
 
-GO MODULE NOTES:
-- When updating dependencies in go.mod, the system will automatically run 'go mod tidy' if needed to resolve go.sum entries
-- This means you can safely update go.mod dependencies and the build validation will handle go.sum updates
-- Focus on providing clean, minimal go.mod updates
+    GO MODULE NOTES:
+    - When updating dependencies in go.mod, the system will automatically run 'go mod tidy' if needed to resolve go.sum entries
+    - This means you can safely update go.mod dependencies and the build validation will handle go.sum updates
+    - Focus on providing clean, minimal go.mod updates
 
-IMPORTANT: Only apply fixes that you are confident are safe and won't break the build.
-ALWAYS return valid JSON - no extra text outside the JSON block
+    IMPORTANT: Only apply fixes that you are confident are safe and won't break the build.
+    ALWAYS return valid JSON - no extra text outside the JSON block
 
-Output Format - MUST be valid JSON:
-```json
-{
-    "success": true,
-    "updated_files": {
-        "go.mod": "module example.com/myapp\\n\\ngo 1.24.4\\n\\nrequire (\\n\\tgolang.org/x/net v0.38.0\\n\\tother-dependency v1.2.3\\n)"
-    },
-    "fix_explanation": "Updated Go version to 1.24.4 to fix syscall and crypto/x509 vulnerabilities. Updated golang.org/x/net to v0.38.0 to fix HTML injection vulnerability. All 3 vulnerabilities have been addressed.",
-    "vulnerabilities_addressed": 3
-}
-```
+    Output Format - MUST be valid JSON:
+    ```json
+    {
+        "success": true,
+        "updated_files": {
+            "go.mod": "module example.com/myapp\\n\\ngo 1.24.4\\n\\nrequire (\\n\\tgolang.org/x/net v0.38.0\\n\\tother-dependency v1.2.3\\n)"
+        },
+        "fix_explanation": "Updated Go version to 1.24.4 to fix syscall and crypto/x509 vulnerabilities. Updated golang.org/x/net to v0.38.0 to fix HTML injection vulnerability. All 3 vulnerabilities have been addressed.",
+        "vulnerabilities_addressed": 3
+    }
+    ```
 
-If you cannot fix the vulnerabilities safely, return:
-```json
-{
-    "success": false,
-    "updated_files": {},
-    "fix_explanation": "Explanation of why fixes cannot be applied safely",
-    "vulnerabilities_addressed": 0
-}
-```"""
+    If you cannot fix the vulnerabilities safely, return:
+    ```json
+    {
+        "success": false,
+        "updated_files": {},
+        "fix_explanation": "Explanation of why fixes cannot be applied safely",
+        "vulnerabilities_addressed": 0
+    }
+    ```"""
 
     human_prompt = f"""Please analyze this govulncheck output and fix the vulnerabilities:
 
-GOVULNCHECK OUTPUT:
-{govulncheck_output}
+    GOVULNCHECK OUTPUT:
+    {govulncheck_output}
 
-CURRENT FILES:
-{files_section}
+    CURRENT FILES:
+    {files_section}
 
-Please provide safe fixes following the conservative approach outlined in the system prompt. Focus on dependency updates in go.mod when possible, and only modify other files if absolutely necessary for the fix.
+    Please provide safe fixes following the conservative approach outlined in the system prompt. Focus on dependency updates in go.mod when possible, and only modify other files if absolutely necessary for the fix.
 
-Please provide fixes following the JSON format specified in the system prompt."""
+    Please provide fixes following the JSON format specified in the system prompt."""
 
     messages = [
         SystemMessage(content=system_prompt),
@@ -389,7 +385,6 @@ Please provide fixes following the JSON format specified in the system prompt.""
     
     logger.info("Sending vulnerability data to AI for analysis")
     
-    # Create LLM instance directly to avoid circular imports
     llm = ChatOpenAI(
         model="gpt-4", 
         temperature=0, 
@@ -440,8 +435,6 @@ def _parse_ai_response(ai_response: str) -> FixResult:
             vulnerabilities_addressed=0,
             error_message=str(e)
         )
-
-
 
 def _apply_structured_changes(repository_path: str, changes: dict, start_time: float) -> StandardToolResponse:
     """Apply structured changes from JSON format."""

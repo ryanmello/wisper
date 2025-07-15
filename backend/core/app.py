@@ -1,7 +1,7 @@
 import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import cipher
+from api import cipher
 from config.settings import settings
 from utils.logging_config import setup_logging, get_logger
 from services.websocket_service import websocket_service
@@ -22,10 +22,11 @@ def create_app() -> FastAPI:
     app.add_event_handler("startup", startup_event)
     app.add_event_handler("shutdown", shutdown_event)
     
-    from api.routes import websocket, waypoint
+    from api import websocket, waypoint, github
     app.include_router(cipher.router, tags=["cipher"])
     app.include_router(websocket.router, tags=["websocket"])
     app.include_router(waypoint.router, tags=["waypoint"])
+    app.include_router(github.router, tags=["github"])
     
     return app
 

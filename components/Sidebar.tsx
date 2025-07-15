@@ -63,8 +63,8 @@ export default function Sidebar() {
   // Navigation items configuration
   const mainNavItems = [
     { icon: Fingerprint, path: "/cipher", title: "Cipher" },
-    { icon: Waypoints, path: "/waypoint", title: "Waypoint" },
     { icon: Flower, path: "/veda", title: "Veda" },
+    { icon: Waypoints, path: "/waypoint", title: "Waypoint" },
     { icon: Sparkles, path: "/conscience", title: "Conscience" },
   ];
 

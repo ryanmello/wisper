@@ -1,5 +1,5 @@
-from .infrastructure.clone_repository_tool import clone_repository
-from .infrastructure.cleanup_repository_tool import cleanup_repository
+from .repository.clone_repository_tool import clone_repository
+from .repository.cleanup_repository_tool import cleanup_repository
 from .analysis.explore_codebase_tool import explore_codebase
 from .analysis.analyze_dependencies_tool import analyze_dependencies
 from .security.scan_go_vulnerabilities_tool import scan_go_vulnerabilities

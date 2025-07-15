@@ -1,14 +1,8 @@
-"""
-Analyze Dependencies Tool - Analyze project dependencies from manifest files
-"""
-
 import os
 import json
 import re
 import time
-from typing import Dict, List, Any
 from langchain_core.tools import tool
-
 from utils.logging_config import get_logger
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 

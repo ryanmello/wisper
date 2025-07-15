@@ -27,22 +27,18 @@ def generate_summary(tool_results: Any) -> StandardToolResponse:
     logger.info("Generating AI-powered summary from analysis results")
     
     try:
-        # Check if OpenAI API key is available
         if not settings.OPENAI_API_KEY:
             logger.warning("No OpenAI API key available - generating basic summary")
             return _generate_basic_fallback(tool_results, start_time)
         
-        # Initialize LLM
         llm = ChatOpenAI(
             model="gpt-4",
             temperature=0.2,
             api_key=settings.OPENAI_API_KEY
         )
         
-        # Create system prompt
         system_prompt = SystemMessage(content=_get_system_prompt())
         
-        # Create human prompt with tool results
         human_prompt = HumanMessage(content=f"""
         Analyze the following repository analysis results and provide a comprehensive summary:
 
@@ -51,17 +47,13 @@ def generate_summary(tool_results: Any) -> StandardToolResponse:
         Respond with a valid JSON object matching the schema provided in the system prompt.
         """)
                 
-        # Generate AI summary
         logger.info("Sending analysis request to AI")
         response = llm.invoke([system_prompt, human_prompt])
         
-        # Parse and validate response
         summary_data = _parse_ai_response(response.content)
         
-        # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
         
-        # Create StandardToolResponse
         result = StandardToolResponse(
             status="success",
             tool_name="generate_summary",
