@@ -7,14 +7,14 @@ from services.task_service import task_service
 logger = get_logger(__name__)
 router = APIRouter()
 
-@router.post("/task/", response_model=AIAnalysisResponse)
+@router.post("/cipher/", response_model=AIAnalysisResponse)
 async def create_task(request: AIAnalysisRequest):
     task_id = await task_service.create_task(
         repository_url=request.repository_url,
         prompt=request.prompt
     )
     
-    websocket_url = f"ws://{settings.HOST}:{settings.PORT}/ws/task/{task_id}"
+    websocket_url = f"ws://{settings.HOST}:{settings.PORT}/ws/cipher/{task_id}"
     
     return AIAnalysisResponse(
         task_id=task_id,

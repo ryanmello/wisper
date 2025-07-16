@@ -33,18 +33,14 @@ class AnalysisService:
 
     async def _run_analysis(self, task_id: str, repository_url: str, prompt: str):
         try:
-            await websocket_service.send_message(task_id, {
-                "type": "progress",
-                "task_id": task_id,
-                "timestamp": "",
-                "progress": {
-                    "percentage": 0,
-                    "current_step": "Starting AI Analysis",
-                    "step_number": 0,
-                    "total_steps": 10
-                },
-                "ai_message": "AI is analyzing your repository based on your prompt..."
-            })
+            await websocket_service.send_progress(
+                task_id, 
+                percentage=0, 
+                current_step="Starting AI Analysis", 
+                step_number=0, 
+                total_steps=10,
+                ai_message="AI is analyzing your repository based on your prompt..."
+            )
             
             logger.info(f"Starting analysis for task {task_id}")
             logger.info(f"Repository: {repository_url}")

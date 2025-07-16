@@ -31,14 +31,47 @@ class WebsocketService:
     async def send_message(self, task_id: str, message: Dict[str, Any]):
         if task_id in self.active_connections:
             try:
-                # Ensure message has required fields for StandardWebSocketMessage
-                if "timestamp" not in message or not message["timestamp"]:
-                    from datetime import datetime
-                    message["timestamp"] = datetime.now().isoformat()
+                # Always ensure timestamp is present and valid
+                from datetime import datetime
+                message["timestamp"] = datetime.now().isoformat()
+                
+                # Ensure task_id is always present
+                if "task_id" not in message:
+                    message["task_id"] = task_id
                 
                 await self.active_connections[task_id].send_text(json.dumps(message))
             except Exception as e:
                 logger.error(f"Failed to send message to {task_id}: {e}")
                 await self.disconnect_websocket(task_id)
+    
+    # Helper method for sending error messages
+    async def send_error(self, task_id: str, error: str, context: str = None):
+        """Send a standardized error message"""
+        message = {
+            "type": "task.error",
+            "error": error
+        }
+        if context:
+            message["context"] = context
+        
+        await self.send_message(task_id, message)
+    
+    # Helper method for sending progress messages
+    async def send_progress(self, task_id: str, percentage: int, current_step: str, 
+                           step_number: int = 0, total_steps: int = 10, ai_message: str = None):
+        """Send a standardized progress message"""
+        message = {
+            "type": "progress",
+            "progress": {
+                "percentage": percentage,
+                "current_step": current_step,
+                "step_number": step_number,
+                "total_steps": total_steps
+            }
+        }
+        if ai_message:
+            message["ai_message"] = ai_message
+        
+        await self.send_message(task_id, message)
 
 websocket_service = WebsocketService()

@@ -99,7 +99,7 @@ export interface StandardWebSocketMessage {
 export class CipherAPI {
   static async createTask(request: AIAnalysisRequest): Promise<AIAnalysisResponse> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/task/`, {
+      const response = await fetch(`${API_BASE_URL}/cipher/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

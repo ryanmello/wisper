@@ -9,7 +9,7 @@ from services.task_service import task_service
 logger = get_logger(__name__)
 router = APIRouter()
 
-@router.websocket("/ws/task/{task_id}")
+@router.websocket("/ws/cipher/{task_id}")
 async def ai_websocket_endpoint(websocket: WebSocket, task_id: str):
     try:
         await websocket_service.connect_websocket(task_id, websocket)
@@ -21,19 +21,11 @@ async def ai_websocket_endpoint(websocket: WebSocket, task_id: str):
         prompt = task_params.get("prompt")
         
         if not repository_url:
-            await websocket_service.send_message(task_id, {
-                "type": "task.error", 
-                "task_id": task_id,
-                "error": "Repository URL is required"
-            })
+            await websocket_service.send_error(task_id, "Repository URL is required")
             return
             
         if not prompt:
-            await websocket_service.send_message(task_id, {
-                "type": "task.error",
-                "task_id": task_id, 
-                "error": "Prompt is required"
-            })
+            await websocket_service.send_error(task_id, "Prompt is required")
             return
         
         logger.info(f"Starting task: {task_id}")
@@ -56,7 +48,6 @@ async def ai_websocket_endpoint(websocket: WebSocket, task_id: str):
                         if cancelled:
                             await websocket_service.send_message(task_id, {
                                 "type": "task.cancelled",
-                                "task_id": task_id,
                                 "message": "AI analysis cancelled by user"
                             })
                         break
@@ -80,12 +71,7 @@ async def ai_websocket_endpoint(websocket: WebSocket, task_id: str):
     except Exception as e:
         logger.error(f"AI WebSocket error for {task_id}: {str(e)}")
         try:
-            await websocket_service.send_message(task_id, {
-                "type": "task.error",
-                "task_id": task_id,
-                "error": str(e),
-                "context": "ai_websocket"
-            })
+            await websocket_service.send_error(task_id, str(e), "ai_websocket")
         except:
             pass
     finally:
