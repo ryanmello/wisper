@@ -65,6 +65,9 @@ async def ai_websocket_endpoint(websocket: WebSocket, task_id: str):
                     pass
                 
             except asyncio.TimeoutError:
+                if task_id not in task_service.active_tasks:
+                    logger.info(f"Analysis completed for task: {task_id}")
+                    break
                 if task_id not in websocket_service.active_connections:
                     break
                 continue
