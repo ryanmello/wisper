@@ -15,6 +15,7 @@ import {
   WaypointConnection,
   WaypointNode,
 } from "@/lib/interface/waypoint-interface";
+import { WaypointAPI } from "@/lib/api/waypoint-api";
 
 export default function Waypoint() {
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
@@ -261,26 +262,21 @@ export default function Waypoint() {
         })),
       };
 
-      const response = await fetch("http://localhost:8000/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(waypointData),
+      const response = await WaypointAPI.verifyWorkflow({
+        nodes: nodes,
+        connections: connections
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.success) {
+      if (response.success) {
         setVerificationStatus("success");
         setVerificationMessage(
-          result.message || "Workflow configuration is valid"
+          response.message || "Workflow configuration is valid"
         );
         setIsStartEnabled(true);
       } else {
         setVerificationStatus("error");
         setVerificationMessage(
-          result.message || "Workflow configuration is invalid"
+          response.message || "Workflow configuration is invalid"
         );
         setIsStartEnabled(false);
       }

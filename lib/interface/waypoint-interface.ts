@@ -21,3 +21,13 @@ export interface WaypointConnection {
   sourceHandle?: string;
   targetHandle?: string;
 }
+
+export interface VerifyWorkflowRequest {
+  nodes: WaypointNode[];
+  connections: WaypointConnection[];
+}
+
+export interface VerifyWorkflowResponse {
+  success: boolean;
+  message: string;
+}
