@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import Image from "next/image";
 import {
   X,
@@ -9,7 +8,6 @@ import {
   Trash2,
   ShoppingCart,
   CreditCard,
-  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/cart-context";
@@ -20,8 +18,7 @@ interface CartSidebarProps {
 }
 
 export default function CartSidebar({ isOpen, onClose }: CartSidebarProps) {
-  const { items, updateQuantity, removeFromCart, getTotalPrice, clearCart } =
-    useCart();
+  const { items, updateQuantity, removeFromCart, getTotalPrice } = useCart();
 
   const formatPrice = (price: number) => {
     return `$${price.toFixed(2)}`;

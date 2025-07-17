@@ -8,15 +8,10 @@ import {
   useEffect,
   useRef,
 } from "react";
-import {
-  Task,
-  ToolResult,
-  CipherAPI,
-  StandardWebSocketMessage
-} from "../lib/api";
 import { useAuth } from "./auth-context";
 import { createTaskFromResponse, updateToolResults } from "@/lib/utils";
-import { AIAnalysisRequest } from "@/lib/interface";
+import { AIAnalysisRequest, StandardWebSocketMessage, Task, ToolResult } from "@/lib/interface/cipher-interface";
+import { CipherAPI } from "@/lib/api/cipher-api";
 
 interface TaskState {
   tasks: Task[];

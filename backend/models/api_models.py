@@ -31,6 +31,132 @@ class AIAnalysisResponse(BaseModel):
     websocket_url: str = Field(..., description="WebSocket URL for real-time AI orchestration updates")
     message: str = Field(..., description="Status message")
 
+# GitHub API Models
+class GitHubRepository(BaseModel):
+    """GitHub repository information"""
+    id: int = Field(..., description="Repository ID")
+    name: str = Field(..., description="Repository name")
+    full_name: str = Field(..., description="Full repository name (owner/repo)")
+    description: Optional[str] = Field(None, description="Repository description")
+    language: Optional[str] = Field(None, description="Primary language")
+    stargazers_count: int = Field(..., description="Number of stars")
+    forks_count: int = Field(..., description="Number of forks")
+    updated_at: str = Field(..., description="Last updated timestamp")
+    private: bool = Field(..., description="Whether repository is private")
+
+class GetRepositoriesRequest(BaseModel):
+    """Request model for getting user repositories"""
+    page: int = Field(1, ge=1, description="Page number for pagination")
+    per_page: int = Field(30, ge=1, le=100, description="Number of repositories per page")
+    sort: str = Field("updated", description="Sort by: created, updated, pushed, full_name")
+    direction: str = Field("desc", description="Sort direction: asc or desc")
+
+class GetRepositoriesResponse(BaseModel):
+    """Response model for getting user repositories"""
+    total_count: int = Field(..., description="Total number of repositories")
+    repositories: List[GitHubRepository] = Field(..., description="List of repositories")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of repositories per page")
+
+class GitHubUser(BaseModel):
+    """GitHub user information"""
+    login: str = Field(..., description="User login name")
+    avatar_url: str = Field(..., description="User avatar URL")
+
+class GitHubLabel(BaseModel):
+    """GitHub label information"""
+    name: str = Field(..., description="Label name")
+    color: str = Field(..., description="Label color")
+
+class GitHubPullRequest(BaseModel):
+    """GitHub pull request information"""
+    id: int = Field(..., description="Pull request number")
+    title: str = Field(..., description="Pull request title")
+    state: str = Field(..., description="Pull request state")
+    repository: Dict[str, str] = Field(..., description="Repository information")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last updated timestamp")
+    html_url: str = Field(..., description="GitHub URL")
+    user: GitHubUser = Field(..., description="Pull request author")
+    comments: int = Field(..., description="Number of comments")
+    labels: List[GitHubLabel] = Field(..., description="Pull request labels")
+
+class GetPullRequestsRequest(BaseModel):
+    """Request model for getting pull requests"""
+    repo_owner: str = Field(..., description="Repository owner")
+    repo_name: str = Field(..., description="Repository name")
+    page: int = Field(1, ge=1, description="Page number for pagination")
+    per_page: int = Field(30, ge=1, le=100, description="Number of PRs per page")
+    state: str = Field("open", description="State of PRs: open, closed, or all")
+
+class GetPullRequestsResponse(BaseModel):
+    """Response model for getting pull requests"""
+    total_count: int = Field(..., description="Total number of pull requests")
+    items: List[GitHubPullRequest] = Field(..., description="List of pull requests")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of pull requests per page")
+
+class GitHubFileChange(BaseModel):
+    """GitHub file change information"""
+    filename: str = Field(..., description="File name")
+    status: str = Field(..., description="File status: added, modified, removed, renamed")
+    additions: int = Field(..., description="Number of additions")
+    deletions: int = Field(..., description="Number of deletions")
+    changes: int = Field(..., description="Total number of changes")
+    patch: str = Field("", description="File patch/diff")
+    previous_filename: Optional[str] = Field(None, description="Previous filename if renamed")
+    blob_url: str = Field(..., description="Blob URL")
+    raw_url: str = Field(..., description="Raw file URL")
+
+class GetPullRequestFilesRequest(BaseModel):
+    """Request model for getting pull request files"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repo_owner: str = Field(..., description="Repository owner")
+    repo_name: str = Field(..., description="Repository name")
+
+class GetPullRequestFilesResponse(BaseModel):
+    """Response model for getting pull request files"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repository: str = Field(..., description="Repository full name")
+    files: List[GitHubFileChange] = Field(..., description="List of file changes")
+    total_files: int = Field(..., description="Total number of files")
+
+class GitHubComment(BaseModel):
+    """GitHub comment information"""
+    id: int = Field(..., description="Comment ID")
+    body: str = Field(..., description="Comment body")
+    user: GitHubUser = Field(..., description="Comment author")
+    created_at: str = Field(..., description="Creation timestamp")
+    updated_at: str = Field(..., description="Last updated timestamp")
+    html_url: str = Field(..., description="GitHub URL")
+
+class GetPullRequestCommentsRequest(BaseModel):
+    """Request model for getting pull request comments"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repo_owner: str = Field(..., description="Repository owner")
+    repo_name: str = Field(..., description="Repository name")
+    page: int = Field(1, ge=1, description="Page number for pagination")
+    per_page: int = Field(30, ge=1, le=100, description="Number of comments per page")
+
+class GetPullRequestCommentsResponse(BaseModel):
+    """Response model for getting pull request comments"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repository: str = Field(..., description="Repository full name")
+    comments: List[GitHubComment] = Field(..., description="List of comments")
+    page: int = Field(..., description="Current page number")
+    per_page: int = Field(..., description="Number of comments per page")
+
+class PostPullRequestCommentRequest(BaseModel):
+    """Request model for posting pull request comment"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repo_owner: str = Field(..., description="Repository owner")
+    repo_name: str = Field(..., description="Repository name")
+    body: str = Field(..., min_length=1, description="Comment body")
+
+class PostPullRequestCommentResponse(BaseModel):
+    """Response model for posting pull request comment"""
+    comment: GitHubComment = Field(..., description="Created comment")
+
 # Waypoint
 class WaypointNode(BaseModel):
     id: str

@@ -9,35 +9,81 @@ import {
   Share2,
   Plus,
   Minus,
-  Star,
   Utensils,
   Flame,
   Users,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { getHeatLevelColor, renderStars, salsaProducts } from "../page";
+import { getHeatLevelColor, renderStars } from "../page";
 import { useCart } from "@/context/cart-context";
 import { toast } from "sonner";
+
+const salsaProducts = [
+  {
+    id: 1,
+    name: "Sweet Potato BBQ Sauce",
+    brand: "Kyvan",
+    description:
+      "Rich and smoky BBQ sauce featuring roasted sweet potatoes for natural sweetness and depth. This unique blend combines traditional BBQ flavors with the earthy sweetness of sweet potato, creating a perfect balance for grilled meats and vegetables.",
+    price: 8.99,
+    originalPrice: 10.99,
+    image: "/kyvan/spbbq.png",
+    heatLevel: "Mild",
+    sizes: ["8oz", "16oz", "24oz"],
+    selectedSize: "16oz",
+    rating: 4.8,
+    reviews: 124,
+    featured: true,
+    servingSize: "2 Tbsp (30g)",
+  },
+  {
+    id: 2,
+    name: "Honey Apple BBQ Sauce",
+    brand: "Kyvan",
+    description:
+      "Sweet and tangy BBQ sauce infused with pure honey and crisp apple flavors. This delightful combination brings together the natural sweetness of honey with the fresh tartness of apples, creating a perfectly balanced sauce that's ideal for pork, chicken, and ribs.",
+    price: 10.99,
+    image: "/kyvan/habbq.png",
+    heatLevel: "Medium",
+    sizes: ["8oz", "12oz", "16oz"],
+    selectedSize: "12oz",
+    rating: 4.9,
+    reviews: 89,
+    featured: true,
+    servingSize: "2 Tbsp (30g)",
+  },
+  {
+    id: 3,
+    name: "Cherry Apple BBQ Sauce",
+    brand: "Kyvan",
+    description:
+      "Bold and fruity BBQ sauce featuring tart cherries and sweet apples in perfect harmony. This gourmet blend offers a sophisticated flavor profile with rich cherry notes and crisp apple undertones, making it exceptional for beef, pork, and grilled vegetables.",
+    price: 9.49,
+    image: "/kyvan/cabbq.png",
+    heatLevel: "Hot",
+    sizes: ["8oz", "12oz", "16oz"],
+    selectedSize: "16oz",
+    rating: 4.7,
+    reviews: 67,
+    servingSize: "2 Tbsp (30g)",
+  },
+];
 
 interface TaskPageProps {
   params: Promise<{ productId: string }>;
 }
 
 const Product = ({ params }: TaskPageProps) => {
-  const [productId, setProductId] = useState<string | null>(null);
   const [product, setProduct] = useState<(typeof salsaProducts)[0] | null>(
     null
   );
   const [selectedSize, setSelectedSize] = useState<string>("8oz");
   const [quantity, setQuantity] = useState<number>(1);
   const [showSizeError, setShowSizeError] = useState(false);
-  const router = useRouter();
   const { addToCart } = useCart();
 
   useEffect(() => {
     const getProductId = async () => {
       const resolvedParams = await params;
-      setProductId(resolvedParams.productId);
 
       // Find the product by ID
       const foundProduct = salsaProducts.find(
@@ -72,9 +118,9 @@ const Product = ({ params }: TaskPageProps) => {
       setShowSizeError(true);
       return;
     }
-    
+
     if (!product) return;
-    
+
     addToCart({
       id: product.id,
       name: product.name,
@@ -82,9 +128,9 @@ const Product = ({ params }: TaskPageProps) => {
       image: product.image,
       size: selectedSize,
       quantity: quantity,
-      maxQuantity: 10
+      maxQuantity: 10,
     });
-    
+
     toast.success("Added to cart!", {
       description: `${quantity}x ${product.name} (${selectedSize}) has been added to your cart.`,
     });

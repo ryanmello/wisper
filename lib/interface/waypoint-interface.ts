@@ -21,15 +21,3 @@ export interface WaypointConnection {
   sourceHandle?: string;
   targetHandle?: string;
 }
-
-export interface AIAnalysisRequest {
-  repository_url: string;
-  prompt: string;
-}
-
-export interface AIAnalysisResponse {
-  task_id: string;
-  status: string;
-  websocket_url: string;
-  message: string;
-}

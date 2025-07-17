@@ -1,4 +1,4 @@
-import Navbar from "@/components/veda/Navbar";
+import Navbar from "@/components/kyvan/Navbar";
 
 export default function VedaLayout({
   children,

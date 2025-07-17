@@ -1,16 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import Image from "next/image";
-import { Star, Flame, ShoppingCart } from "lucide-react";
+import { Star, Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCart } from "@/context/cart-context";
-import { toast } from "sonner";
 
-export const salsaProducts = [
+const salsaProducts = [
   {
     id: 1,
     name: "Sweet Potato BBQ Sauce",

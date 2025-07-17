@@ -2,28 +2,17 @@ import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Github, ChevronDown } from "lucide-react";
-
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  updated_at: string;
-  private: boolean;
-}
+import { GitHubRepository } from "@/lib/interface/github-interface";
 
 interface RepoDropdownProps {
-  repositories: GitHubRepo[];
-  selectedRepo: GitHubRepo | null;
+  repositories: GitHubRepository[];
+  selectedRepo: GitHubRepository | null;
   showDropdown: boolean;
   showDropdownContent: boolean;
   repoError: string | null;
   dropdownTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   toggleDropdown: () => void;
-  setSelectedRepo: (repo: GitHubRepo) => void;
+  setSelectedRepo: (repo: GitHubRepository) => void;
   setShowDropdown: (show: boolean) => void;
   setShowDropdownContent: (show: boolean) => void;
   getLanguageColor: (language: string | null) => string;

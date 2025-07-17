@@ -25,82 +25,32 @@ import {
 } from "lucide-react";
 import RepoDropdown from "@/components/cipher/RepoDropdown";
 import PullRequestsDropdown from "@/components/veda/PullRequestsDropdown";
-
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  updated_at: string;
-  private: boolean;
-}
-
-interface PullRequest {
-  id: number;
-  title: string;
-  state: string;
-  repository: {
-    name: string;
-    full_name: string;
-    owner: string;
-  };
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-  user: {
-    login: string;
-    avatar_url: string;
-  };
-  comments: number;
-  labels: Array<{ name: string; color: string }>;
-}
-
-interface FileChange {
-  filename: string;
-  status: string;
-  additions: number;
-  deletions: number;
-  changes: number;
-  patch: string;
-  blob_url: string;
-  raw_url: string;
-}
-
-interface Comment {
-  id: number;
-  body: string;
-  user: {
-    login: string;
-    avatar_url: string;
-  };
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-}
+import { GitHubComment, GitHubFileChange, GitHubPullRequest, GitHubRepository } from "@/lib/interface/github-interface";
+import { GitHubAPI } from "@/lib/api/github-api";
+import Image from "next/image";
 
 export default function Veda() {
   // Repository state
-  const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(
+    null
+  );
   const [showRepoDropdown, setShowRepoDropdown] = useState(false);
   const [showRepoDropdownContent, setShowRepoDropdownContent] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
   const repoDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pull request state
-  const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
-  const [selectedPR, setSelectedPR] = useState<PullRequest | null>(null);
+  const [pullRequests, setPullRequests] = useState<GitHubPullRequest[]>([]);
+  const [selectedPR, setSelectedPR] = useState<GitHubPullRequest | null>(null);
   const [showPRDropdown, setShowPRDropdown] = useState(false);
   const [showPRDropdownContent, setShowPRDropdownContent] = useState(false);
   const [prError, setPrError] = useState<string | null>(null);
   const prDropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Analysis state
-  const [fileChanges, setFileChanges] = useState<FileChange[]>([]);
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [fileChanges, setFileChanges] = useState<GitHubFileChange[]>([]);
+  const [comments, setComments] = useState<GitHubComment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -116,14 +66,8 @@ export default function Veda() {
     try {
       setLoading(true);
       setRepoError(null);
-      const response = await fetch("http://localhost:8000/repositories");
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setRepositories(data.repositories || []);
+      const response = await GitHubAPI.getRepositories();
+      setRepositories(response.repositories || []);
     } catch (err) {
       setRepoError(
         err instanceof Error ? err.message : "Failed to fetch repositories"
@@ -135,7 +79,7 @@ export default function Veda() {
   };
 
   // Handle repository selection
-  const handleRepoSelection = async (repo: GitHubRepo) => {
+  const handleRepoSelection = async (repo: GitHubRepository) => {
     setSelectedRepo(repo);
     setSelectedPR(null);
     setFileChanges([]);
@@ -145,21 +89,17 @@ export default function Veda() {
   };
 
   // Fetch pull requests for selected repository
-  const fetchPullRequests = async (repo: GitHubRepo) => {
+  const fetchPullRequests = async (repo: GitHubRepository) => {
     try {
       setLoading(true);
       setPrError(null);
       const repoOwner = repo.full_name.split("/")[0];
-      const response = await fetch(
-        `http://localhost:8000/pullrequests?state=all&repo_owner=${repoOwner}&repo_name=${repo.name}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setPullRequests(data.items || []);
+      const response = await GitHubAPI.getPullRequests({
+        repo_owner: repoOwner,
+        repo_name: repo.name,
+        state: "all",
+      });
+      setPullRequests(response.items || []);
     } catch (err) {
       setPrError(
         err instanceof Error ? err.message : "Failed to fetch pull requests"
@@ -171,7 +111,7 @@ export default function Veda() {
   };
 
   // Handle pull request selection
-  const handlePRSelection = async (pr: PullRequest) => {
+  const handlePRSelection = async (pr: GitHubPullRequest) => {
     setSelectedPR(pr);
     setExpandedFiles(new Set()); // Reset expanded files when switching PRs
     setLoading(true);
@@ -191,18 +131,14 @@ export default function Veda() {
   };
 
   // Fetch file changes for selected pull request
-  const fetchFileChanges = async (pr: PullRequest) => {
+  const fetchFileChanges = async (pr: GitHubPullRequest) => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/pullrequests/${pr.id}/files?repo_owner=${pr.repository.owner}&repo_name=${pr.repository.name}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const files = data.files || [];
+      const response = await GitHubAPI.getPullRequestFiles({
+        pr_id: pr.id,
+        repo_owner: pr.repository.owner,
+        repo_name: pr.repository.name,
+      });
+      const files = response.files || [];
       setFileChanges(files);
 
       // Expand all files by default
@@ -216,18 +152,14 @@ export default function Veda() {
   };
 
   // Fetch comments for selected pull request
-  const fetchComments = async (pr: PullRequest) => {
+  const fetchComments = async (pr: GitHubPullRequest) => {
     try {
-      const response = await fetch(
-        `http://localhost:8000/pullrequests/${pr.id}/comments?repo_owner=${pr.repository.owner}&repo_name=${pr.repository.name}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setComments(data.comments || []);
+      const response = await GitHubAPI.getPullRequestComments({
+        pr_id: pr.id,
+        repo_owner: pr.repository.owner,
+        repo_name: pr.repository.name,
+      });
+      setComments(response.comments || []);
     } catch (err) {
       console.error("Error fetching comments:", err);
     }
@@ -239,23 +171,13 @@ export default function Veda() {
 
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://localhost:8000/pullrequests/${selectedPR.id}/comments?repo_owner=${selectedPR.repository.owner}&repo_name=${selectedPR.repository.name}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ body: newComment }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const newCommentData = await response.json();
-      setComments([...comments, newCommentData]);
+      const response = await GitHubAPI.postPullRequestComment({
+        pr_id: selectedPR.id,
+        repo_owner: selectedPR.repository.owner,
+        repo_name: selectedPR.repository.name,
+        body: newComment,
+      });
+      setComments([...comments, response.comment]);
       setNewComment("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to post comment");
@@ -557,7 +479,7 @@ export default function Veda() {
                                     let lineClass = "";
                                     let bgClass = "";
                                     let borderClass = "";
-                                    let isNoNewline = line.startsWith("\\");
+                                    const isNoNewline = line.startsWith("\\");
 
                                     if (line.startsWith("+")) {
                                       bgClass = "bg-green-50";
@@ -575,8 +497,10 @@ export default function Veda() {
                                       lineClass = "text-blue-800 font-semibold";
                                     } else if (isNoNewline) {
                                       bgClass = "bg-gray-50";
-                                      borderClass = "border-l-4 border-gray-300";
-                                      lineClass = "text-gray-500 text-xs italic";
+                                      borderClass =
+                                        "border-l-4 border-gray-300";
+                                      lineClass =
+                                        "text-gray-500 text-xs italic";
                                     } else {
                                       bgClass = "bg-white";
                                       lineClass = "text-gray-700";
@@ -590,7 +514,7 @@ export default function Veda() {
                                         <td
                                           className={`px-2 py-1 text-right text-gray-400 select-none w-12 ${borderClass}`}
                                         >
-                                          {!isNoNewline && (idx + 1)}
+                                          {!isNoNewline && idx + 1}
                                         </td>
                                         <td
                                           className={`px-4 py-1 ${lineClass} whitespace-pre-wrap`}
@@ -675,10 +599,11 @@ export default function Veda() {
                       >
                         <div className="flex items-start space-x-3">
                           <Avatar className="w-9 h-9">
-                            <img
+                            <Image
                               src={comment.user.avatar_url}
                               alt={comment.user.login}
                               className="rounded-full"
+                              width="100"
                             />
                           </Avatar>
                           <div className="flex-1 min-w-0">

@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Waypoints,
   Sparkles,
-  Vegan,
   Flower,
 } from "lucide-react";
 

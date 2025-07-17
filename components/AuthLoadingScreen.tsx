@@ -1,11 +1,7 @@
 import {
   Fingerprint,
-  LogOut,
-  Settings,
-  HelpCircle,
   Waypoints,
   Sparkles,
-  Vegan,
   Flower,
 } from "lucide-react";
 

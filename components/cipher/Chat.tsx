@@ -7,18 +7,8 @@ import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
 import { AlertCircle, ArrowUpRight } from "lucide-react";
 import RepoDropdown from "./RepoDropdown";
-
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  description: string | null;
-  language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  updated_at: string;
-  private: boolean;
-}
+import { GitHubRepository } from "@/lib/interface/github-interface";
+import { GitHubAPI } from "@/lib/api/github-api";
 
 interface ChatProps {
   isAuthenticated: boolean;
@@ -34,8 +24,8 @@ export function Chat({ isAuthenticated }: ChatProps) {
   
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
-  const [repositories, setRepositories] = useState<GitHubRepo[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showDropdownContent, setShowDropdownContent] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
@@ -65,28 +55,14 @@ export function Chat({ isAuthenticated }: ChatProps) {
   useEffect(() => {
     const fetchRepositories = async () => {
       if (!isAuthenticated) return;
-      
-      const storedToken = localStorage.getItem("github_token");
-      if (!storedToken) return;
 
       try {
         setRepoError(null);
-        const reposResponse = await fetch(
-          "https://api.github.com/user/repos?sort=updated&per_page=50",
-          {
-            headers: {
-              Authorization: `token ${storedToken}`,
-              Accept: "application/vnd.github.v3+json",
-            },
-          }
-        );
-
-        if (reposResponse.ok) {
-          const repos = await reposResponse.json();
-          setRepositories(repos);
-        } else {
-          setRepoError("Failed to fetch repositories from GitHub");
-        }
+        const response = await GitHubAPI.getRepositories({
+          sort: "updated",
+          per_page: 50
+        });
+        setRepositories(response.repositories);
       } catch (error) {
         console.error("Failed to fetch repositories:", error);
         setRepoError("Unable to connect to GitHub. Please check your connection.");

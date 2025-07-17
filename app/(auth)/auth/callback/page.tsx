@@ -59,6 +59,7 @@ function GitHubCallbackContent() {
             router.push("/cipher");
           }, 2000);
         } catch (loginError) {
+          console.error(loginError)
           throw new Error("Failed to authenticate with GitHub");
         }
 
@@ -70,7 +71,7 @@ function GitHubCallbackContent() {
     };
 
     handleCallback();
-  }, [searchParams, router]);
+  }, [searchParams, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">

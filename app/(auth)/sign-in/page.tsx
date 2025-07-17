@@ -12,18 +12,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { StatusBadge } from "@/components/ui/status";
 import {
   Github,
-  ExternalLink,
   AlertCircle,
   CheckCircle,
   Settings,
   Fingerprint,
   ArrowRight,
 } from "lucide-react";
-
-
 
 export default function SignInPage() {
   const router = useRouter();

@@ -1,38 +1,18 @@
 import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { GitPullRequest, ChevronDown } from "lucide-react";
-
-interface PullRequest {
-  id: number;
-  title: string;
-  state: string;
-  repository: {
-    name: string;
-    full_name: string;
-    owner: string;
-  };
-  created_at: string;
-  updated_at: string;
-  html_url: string;
-  user: {
-    login: string;
-    avatar_url: string;
-  };
-  comments: number;
-  labels: Array<{ name: string; color: string }>;
-}
+import { GitHubPullRequest } from "@/lib/interface/github-interface";
 
 interface PullRequestsDropdownProps {
-  pullRequests: PullRequest[];
-  selectedPR: PullRequest | null;
+  pullRequests: GitHubPullRequest[];
+  selectedPR: GitHubPullRequest | null;
   showDropdown: boolean;
   showDropdownContent: boolean;
   prError: string | null;
   dropdownTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
   toggleDropdown: () => void;
-  setSelectedPR: (pr: PullRequest) => void;
+  setSelectedPR: (pr: GitHubPullRequest) => void;
   setShowDropdown: (show: boolean) => void;
   setShowDropdownContent: (show: boolean) => void;
   disabled?: boolean;

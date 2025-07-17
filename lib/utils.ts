@@ -1,7 +1,8 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Task, ToolResult } from "./api";
-import { AIAnalysisRequest, AIAnalysisResponse } from "./interface";
+import { AIAnalysisRequest, AIAnalysisResponse, Task, ToolResult } from "./interface/cipher-interface";
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

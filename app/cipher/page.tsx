@@ -9,8 +9,8 @@ import { Chat } from "@/components/cipher/Chat";
 import { TaskTab } from "@/components/cipher/TaskTab";
 import { Button } from "@/components/ui/button";
 import { Fingerprint } from "lucide-react";
-import { Task } from "@/lib/api";
 import { useAuth } from "@/context/auth-context";
+import { Task } from "@/lib/interface/cipher-interface";
 
 const CipherPage = () => {
   const router = useRouter();

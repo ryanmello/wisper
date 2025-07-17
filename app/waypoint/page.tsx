@@ -6,12 +6,15 @@ import Canvas from "@/components/waypoint/Canvas";
 import ToolSidebar from "@/components/waypoint/ToolSidebar";
 import StatusBar from "@/components/waypoint/StatusBar";
 import { useAuth } from "@/context/auth-context";
-import { WaypointNode, WaypointConnection } from "@/lib/interface";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import {
+  WaypointConnection,
+  WaypointNode,
+} from "@/lib/interface/waypoint-interface";
 
 export default function Waypoint() {
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
@@ -114,7 +117,9 @@ export default function Waypoint() {
 
     // Remove all connections involving this node
     setConnections((prev) =>
-      prev.filter((conn) => conn.source_id !== nodeId && conn.target_id !== nodeId)
+      prev.filter(
+        (conn) => conn.source_id !== nodeId && conn.target_id !== nodeId
+      )
     );
 
     // Clear selection if deleted node was selected
@@ -193,7 +198,8 @@ export default function Waypoint() {
       // Check for existing connections to prevent duplicates
       const existingConnection = connections.find(
         (conn) =>
-          conn.source_id === sourceNodeId && conn.target_id === targetNodeId_final
+          conn.source_id === sourceNodeId &&
+          conn.target_id === targetNodeId_final
       );
 
       if (existingConnection) {
@@ -209,8 +215,10 @@ export default function Waypoint() {
         id: `${sourceNodeId}-${targetNodeId_final}-${Date.now()}`,
         source_id: sourceNodeId,
         target_id: targetNodeId_final,
-        source_tool_name: nodes.find(n => n.id === sourceNodeId)?.tool_name || '',
-        target_tool_name: nodes.find(n => n.id === targetNodeId_final)?.tool_name || '',
+        source_tool_name:
+          nodes.find((n) => n.id === sourceNodeId)?.tool_name || "",
+        target_tool_name:
+          nodes.find((n) => n.id === targetNodeId_final)?.tool_name || "",
         sourceHandle: "output",
         targetHandle: "input",
       };
@@ -249,14 +257,14 @@ export default function Waypoint() {
           source_id: conn.source_id,
           source_tool_name: conn.source_tool_name,
           target_id: conn.target_id,
-          target_tool_name: conn.target_tool_name
+          target_tool_name: conn.target_tool_name,
         })),
       };
 
-      const response = await fetch('http://localhost:8000/verify', {
-        method: 'POST',
+      const response = await fetch("http://localhost:8000/verify", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(waypointData),
       });
@@ -302,6 +310,8 @@ export default function Waypoint() {
         })),
       };
 
+      console.log(workflowData);
+
       // Simulate some delay for realistic feel
       await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -310,6 +320,8 @@ export default function Waypoint() {
         executionId: `exec_${Date.now()}`,
         message: "Workflow execution started successfully",
       };
+
+      console.log(mockResult);
 
       // Reset verification status after starting
       resetVerificationStatus();
@@ -320,10 +332,7 @@ export default function Waypoint() {
 
   return (
     <div className="h-screen flex flex-col bg-white">
-      <ResizablePanelGroup
-        direction="horizontal"
-        className="flex-1"
-      >
+      <ResizablePanelGroup direction="horizontal" className="flex-1">
         <ResizablePanel defaultSize={15} minSize={15} maxSize={40}>
           <ToolSidebar onDragStart={handleToolDragStart} />
         </ResizablePanel>

@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { WorkflowNode } from "./WorkflowNode";
-import { WaypointConnection, WaypointNode } from "@/lib/interface";
+import { WaypointConnection, WaypointNode } from "@/lib/interface/waypoint-interface";
 
 const Canvas: React.FC<{
   nodes: WaypointNode[];
@@ -89,7 +89,7 @@ const Canvas: React.FC<{
           `,
         backgroundSize: "20px 20px",
       }}
-      onClick={(e) => {
+      onClick={() => {
         onCanvasClick();
         onHideNodeActions();
       }}

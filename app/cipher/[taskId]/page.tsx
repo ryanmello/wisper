@@ -30,9 +30,9 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Task, ToolResult } from "@/lib/api";
 import { cn, formatTimeAgo, getStatusColor } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
+import { Task, ToolResult } from "@/lib/interface/cipher-interface";
 
 interface TaskPageProps {
   params: Promise<{ taskId: string }>;
