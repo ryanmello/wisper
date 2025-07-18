@@ -9,6 +9,80 @@ import json
 logger = get_logger(__name__)
 router = APIRouter()
 
+@router.get("/repositories")
+async def get_user_repositories(
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    per_page: int = Query(30, ge=1, le=100, description="Number of repositories per page"),
+    sort: str = Query("updated", description="Sort by: created, updated, pushed, full_name"),
+    direction: str = Query("desc", description="Sort direction: asc or desc")
+):
+    """
+    Get authenticated user's repositories using GitHub token from settings
+    """
+    try:
+        # Use token from settings
+        if not settings.GITHUB_TOKEN:
+            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        
+        token = settings.GITHUB_TOKEN
+        
+        # GitHub API endpoint for user repositories
+        url = "https://api.github.com/user/repos"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+        
+        # Parameters for the repositories endpoint
+        params = {
+            "visibility": "all",  # Include both public and private repos
+            "affiliation": "owner,collaborator",  # Include owned and collaborated repos
+            "sort": sort,
+            "direction": direction,
+            "page": page,
+            "per_page": per_page
+        }
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params)
+            
+            if response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid GitHub token")
+            elif response.status_code != 200:
+                logger.error(f"GitHub API error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch repositories")
+            
+            repositories_data = response.json()
+            
+            # Transform the response to include relevant repository information
+            repositories = []
+            for repo in repositories_data:
+                repo_data = {
+                    "id": repo["id"],
+                    "name": repo["name"],
+                    "full_name": repo["full_name"],
+                    "description": repo.get("description"),
+                    "language": repo.get("language"),
+                    "stargazers_count": repo["stargazers_count"],
+                    "forks_count": repo["forks_count"],
+                    "updated_at": repo["updated_at"],
+                    "private": repo["private"]
+                }
+                repositories.append(repo_data)
+            
+            return {
+                "total_count": len(repositories),
+                "repositories": repositories,
+                "page": page,
+                "per_page": per_page
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching repositories: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @router.get("/pullrequests")
 async def get_user_pull_requests(
     page: int = Query(1, ge=1, description="Page number for pagination"),

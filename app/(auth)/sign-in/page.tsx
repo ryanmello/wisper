@@ -231,18 +231,6 @@ export default function SignInPage() {
                   Back to Options
                 </Button>
               </div>
-
-              <div className="pt-4 border-t">
-                <a
-                  href="https://github.com/settings/tokens/new?scopes=repo,user&description=Cipher%20AI%20Assistant"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center space-x-1 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  <span>Create a new token on GitHub</span>
-                </a>
-              </div>
             </CardContent>
           </Card>
 

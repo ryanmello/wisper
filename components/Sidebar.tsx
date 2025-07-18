@@ -57,27 +57,21 @@ export default function Sidebar() {
   };
 
   const isActivePage = (path: string) => {
+    if (path === "/") return pathname === "/";
     return pathname.startsWith(path);
   };
 
-  // Navigation items configuration
   const mainNavItems = [
+    { icon: Sparkles, path: "/", title: "Conscience" },
     { icon: Fingerprint, path: "/cipher", title: "Cipher" },
     { icon: Flower, path: "/veda", title: "Veda" },
     { icon: Waypoints, path: "/waypoint", title: "Waypoint" },
-    { icon: Sparkles, path: "/conscience", title: "Conscience" },
   ];
 
   const helpNavItems = [{ icon: HelpCircle, path: "/docs", title: "Help" }];
 
   return (
     <div className="w-16 bg-card/80 backdrop-blur-sm border-r border-border flex flex-col fixed left-0 top-0 h-full z-40">
-      {/* Sidebar Header */}
-      {/* <div className="p-4 border-b border-border flex justify-center">
-        <Fingerprint size={24} />
-      </div> */}
-
-      {/* Navigation */}
       <nav className="flex-1 p-2 space-y-2">
         <div className="h-full flex flex-col justify-between">
           <div className="space-y-2">

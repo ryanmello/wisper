@@ -4,6 +4,9 @@ from langchain_openai import ChatOpenAI
 from config.settings import settings
 from tools import ALL_TOOLS
 from models.api_models import VerifyConfigurationResponse, WaypointNode, WaypointConnection
+from config.settings import get_logger
+
+logger = get_logger(__name__)
 
 class WaypointService():
     def __init__(self):
@@ -104,6 +107,7 @@ class WaypointService():
         
         response = self.llm.invoke(prompt)
         response_text = response.content
+        logger.info(response_text)
         
         try:
             result = json.loads(response_text)

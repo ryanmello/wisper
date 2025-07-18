@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Routes that require authentication
-const protectedRoutes = ['/cipher', '/waypoint', '/veda', '/conscience', '/docs'];
+const protectedRoutes = ['/cipher', '/waypoint', '/veda'];
 
 // Routes that should redirect authenticated users
 const authRoutes = ['/sign-in'];
