@@ -177,6 +177,17 @@ class VerifyConfigurationResponse(BaseModel):
     success: bool = Field(..., description="Represents a valid configuration")
     message: str = Field(..., description="Human-readable message about the validation result")
 
+class AvailableToolInfo(BaseModel):
+    """Information about an available tool"""
+    name: str = Field(..., description="Tool name/identifier")
+    description: str = Field(..., description="Tool description and purpose")
+    parameters: Dict[str, Any] = Field(..., description="Tool parameters schema")
+    category: str = Field(..., description="Tool category (e.g., repository, analysis, security)")
+
+class GetToolsResponse(BaseModel):
+    """Response model for getting available tools"""
+    tools: List[AvailableToolInfo] = Field(..., description="List of available tools")
+
 class StandardError(BaseModel):
     """Standardized error information"""
     message: str = Field(..., description="Human-readable error message")

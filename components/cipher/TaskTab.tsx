@@ -1,6 +1,6 @@
+import { Task } from "@/lib/interface/cipher-interface";
 import { cn, formatTimeAgo, getStatusColor } from "@/lib/utils";
 import { Github, Loader2 } from "lucide-react";
-import { Task } from "@/lib/api";
 
 interface TaskTabProps {
   tasks: Task[];

@@ -12,8 +12,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { WaypointConnection, WaypointNode } from "@/lib/interface";
 import { cn } from "@/lib/utils";
+import { WaypointConnection, WaypointNode } from "@/lib/interface/waypoint-interface";
 
 interface StatusBarProps {
   nodes: WaypointNode[];

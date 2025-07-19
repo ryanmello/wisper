@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/context/auth-context";
 import { TaskProvider } from "@/context/task-context";
-import { CartProvider } from "@/context/cart-context";
 import Sidebar from "@/components/Sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -21,11 +20,9 @@ export default function RootLayout({
       <body className={`antialiased`}>
         <AuthProvider>
           <TaskProvider>
-            <CartProvider>
               <Sidebar />
               <main className="pl-16">{children}</main>
               <Toaster position="bottom-center" />
-            </CartProvider>
           </TaskProvider>
         </AuthProvider>
       </body>

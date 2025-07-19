@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { WaypointNode } from "@/lib/interface"
+import { WaypointNode } from "@/lib/interface/waypoint-interface";
 
 interface WorkflowNodeProps {
   node: WaypointNode;

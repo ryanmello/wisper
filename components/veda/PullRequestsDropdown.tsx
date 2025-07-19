@@ -56,7 +56,12 @@ export default function PullRequestsDropdown({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [showDropdown, dropdownTimeoutRef, setShowDropdown, setShowDropdownContent]);
+  }, [
+    showDropdown,
+    dropdownTimeoutRef,
+    setShowDropdown,
+    setShowDropdownContent,
+  ]);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -81,7 +86,7 @@ export default function PullRequestsDropdown({
               selectedPR && !showDropdown ? "whitespace-nowrap" : "truncate"
             )}
           >
-            {disabled ? "Select a repository first" : selectedPR ? selectedPR.title : "Select pull request"}
+            {selectedPR ? selectedPR.title : "Select pull request"}
           </span>
         </div>
         <ChevronDown
@@ -126,14 +131,18 @@ export default function PullRequestsDropdown({
                 >
                   <div className="w-full">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium truncate flex-1">{pr.title}</span>
+                      <span className="font-medium truncate flex-1">
+                        {pr.title}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <span>#{pr.id}</span>
                       <span>•</span>
                       <span>{pr.comments} comments</span>
                       <span>•</span>
-                      <span>{new Date(pr.updated_at).toLocaleDateString()}</span>
+                      <span>
+                        {new Date(pr.updated_at).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
                 </Button>
@@ -145,4 +154,3 @@ export default function PullRequestsDropdown({
     </div>
   );
 }
-
