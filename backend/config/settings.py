@@ -15,6 +15,7 @@ class Settings:
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "info")
     
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    BACKEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:8000")
     ALLOWED_ORIGINS: List[str] = [
         FRONTEND_URL,
         "http://localhost:3000"

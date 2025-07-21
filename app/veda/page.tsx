@@ -27,9 +27,14 @@ import {
   GitHubRepository,
 } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
+import { VedaAPI } from "@/lib/api/veda-api";
+import { useAuth } from "@/context/auth-context";
 import Image from "next/image";
 
 export default function Veda() {
+  // Auth context
+  const { user } = useAuth();
+
   // Repository state
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(
@@ -56,10 +61,23 @@ export default function Veda() {
   const [error, setError] = useState<string | null>(null);
   const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set());
 
+  // WebSocket state for Veda analysis
+  const [vedaWebSocket, setVedaWebSocket] = useState<WebSocket | null>(null);
+  const [vedaAnalysisProgress, setVedaAnalysisProgress] = useState<string>("");
+
   // Fetch user repositories on component mount
   useEffect(() => {
     fetchUserRepositories();
   }, []);
+
+  // Cleanup WebSocket on unmount
+  useEffect(() => {
+    return () => {
+      if (vedaWebSocket) {
+        vedaWebSocket.close();
+      }
+    };
+  }, [vedaWebSocket]);
 
   // Fetch user repositories
   const fetchUserRepositories = async () => {
@@ -167,7 +185,7 @@ export default function Veda() {
 
   // Post comment
   const postComment = async () => {
-    if (!newComment.trim() || !selectedPR) return;
+    if (!newComment.trim() || !selectedPR || !user) return;
 
     const tempId = Date.now(); // Use timestamp as temporary ID
     const skeletonComment: GitHubComment = {
@@ -186,21 +204,41 @@ export default function Veda() {
     const currentCommentText = newComment;
     setComments([...comments, skeletonComment]);
     setNewComment("");
+    setLoading(true);
 
     try {
-      const response = await GitHubAPI.postPullRequestComment({
-        pr_id: selectedPR.id,
-        repo_owner: selectedPR.repository.owner,
-        repo_name: selectedPR.repository.name,
-        body: currentCommentText,
-      });
+      // Make both API calls simultaneously
+      const [githubResponse, vedaResponse] = await Promise.all([
+        GitHubAPI.postPullRequestComment({
+          pr_id: selectedPR.id,
+          repo_owner: selectedPR.repository.owner,
+          repo_name: selectedPR.repository.name,
+          body: currentCommentText,
+        }),
+        VedaAPI.analyzeComment({
+          pr_id: selectedPR.id,
+          repo_owner: selectedPR.repository.owner,
+          repo_name: selectedPR.repository.name,
+          user_comment: currentCommentText,
+          user_login: user.login,
+        })
+      ]);
 
       // Replace skeleton comment with real comment
       setComments((prevComments) =>
         prevComments.map((comment) =>
-          comment.id === tempId ? response.comment : comment
+          comment.id === tempId ? githubResponse.comment : comment
         )
       );
+
+      // Log Veda analysis response
+      console.log("Veda analysis started:", vedaResponse);
+
+      // Connect to WebSocket for real-time updates if available
+      if (vedaResponse.websocket_url) {
+        connectToVedaWebSocket(vedaResponse.task_id, vedaResponse.websocket_url);
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to post comment");
       console.error("Error posting comment:", err);
@@ -214,6 +252,60 @@ export default function Veda() {
       setNewComment(currentCommentText);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Connect to Veda WebSocket for analysis updates
+  const connectToVedaWebSocket = (taskId: string, websocketUrl: string) => {
+    try {
+      // Close existing connection if any
+      if (vedaWebSocket) {
+        vedaWebSocket.close();
+      }
+
+      const ws = new WebSocket(websocketUrl);
+
+      ws.onopen = () => {
+        console.log("Connected to Veda analysis WebSocket");
+        setVedaAnalysisProgress("Connected to Veda analysis...");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          console.log("Veda analysis update:", message);
+
+          if (message.type === "progress" && message.progress) {
+            setVedaAnalysisProgress(message.progress.current_step);
+          } else if (message.type === "analysis_completed") {
+            setVedaAnalysisProgress("Analysis completed!");
+            // Optionally refresh comments to see any new ones from Veda
+            if (selectedPR) {
+              fetchComments(selectedPR);
+            }
+          } else if (message.type === "analysis_error") {
+            setVedaAnalysisProgress("Analysis failed");
+            setError("Veda analysis failed: " + (message.error?.message || "Unknown error"));
+          }
+        } catch (err) {
+          console.error("Error parsing Veda WebSocket message:", err);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("Veda analysis WebSocket closed");
+        setVedaAnalysisProgress("");
+      };
+
+      ws.onerror = (error) => {
+        console.error("Veda WebSocket error:", error);
+        setError("Connection to Veda analysis failed");
+      };
+
+      setVedaWebSocket(ws);
+    } catch (err) {
+      console.error("Failed to connect to Veda WebSocket:", err);
+      setError("Failed to connect to analysis updates");
     }
   };
 
@@ -561,6 +653,18 @@ export default function Veda() {
 
               {/* Chat Interface */}
               <div className="border-t border-gray-100 p-4 bg-white rounded-b-xl">
+                {/* Veda Analysis Progress */}
+                {vedaAnalysisProgress && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-blue-700 text-sm font-medium">
+                        {vedaAnalysisProgress}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   <Textarea
                     value={newComment}

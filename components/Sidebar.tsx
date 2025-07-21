@@ -14,6 +14,7 @@ import {
   Waypoints,
   Sparkles,
   Flower,
+  Layers,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -65,6 +66,7 @@ export default function Sidebar() {
     { icon: Fingerprint, path: "/cipher", title: "Cipher" },
     { icon: Flower, path: "/veda", title: "Veda" },
     { icon: Waypoints, path: "/waypoint", title: "Waypoint" },
+    { icon: Layers, path: "/playbook", title: "Playbook" },
   ];
 
   const helpNavItems = [{ icon: HelpCircle, path: "/docs", title: "Help" }];

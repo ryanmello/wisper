@@ -10,7 +10,7 @@ from models.api_models import StandardToolResponse
 logger = get_logger(__name__)
 
 @tool
-def clone_repository(repository_url: str) -> StandardToolResponse:
+def clone_repository(repository_url: str, branch: str = None) -> StandardToolResponse:
     """Clone a Git repository to local temporary storage for analysis.
     
     This tool downloads the entire repository codebase to a temporary directory where it can be analyzed by other tools. 
@@ -22,6 +22,7 @@ def clone_repository(repository_url: str) -> StandardToolResponse:
     
     Args:
         repository_url: The GitHub repository URL to clone
+        branch: Optional specific branch to checkout after cloning (e.g., "feature-branch", "security-fixes-123")
         
     Returns:
         StandardToolResponse with clone_path, repository_name, branch, and metadata
@@ -34,21 +35,43 @@ def clone_repository(repository_url: str) -> StandardToolResponse:
         temp_dir = tempfile.mkdtemp(prefix=settings.TEMP_DIR_PREFIX)
         logger.info(f"Cloning repository {repository_url} to {temp_dir}")
         
-        # Clone repository
-        repo = Repo.clone_from(repository_url, temp_dir)
+        # Clone repository with specific branch if requested
+        if branch:
+            try:
+                logger.info(f"Cloning repository with specific branch: {branch}")
+                repo = Repo.clone_from(repository_url, temp_dir, branch=branch)
+                final_branch = branch
+                logger.info(f"Successfully cloned directly to branch: {branch}")
+            except Exception as e:
+                logger.warning(f"Failed to clone branch {branch}: {e}")
+                logger.info(f"Falling back to default branch clone")
+                repo = Repo.clone_from(repository_url, temp_dir)
+                final_branch = repo.active_branch.name
+        else:
+            logger.info(f"Cloning repository with default branch")
+            repo = Repo.clone_from(repository_url, temp_dir)
+            final_branch = repo.active_branch.name
+            
+        logger.info(f"Clone completed on branch: {final_branch}")
         
         # Prepare successful response data
         clone_data = {
             "clone_path": temp_dir,
             "repository_name": Path(repository_url).name.replace('.git', ''),
-            "branch": repo.active_branch.name,
+            "branch": final_branch,
+            "requested_branch": branch,
             "commit_count": len(list(repo.iter_commits())),
             "last_commit": repo.head.commit.hexsha[:8],
             "repository_url": repository_url
         }
         
         # Generate summary
-        summary = f"Successfully cloned {clone_data['repository_name']} ({clone_data['commit_count']} commits) to temporary directory"
+        if branch and final_branch == branch:
+            summary = f"Successfully cloned {clone_data['repository_name']} on branch '{final_branch}' ({clone_data['commit_count']} commits) to temporary directory"
+        elif branch and final_branch != branch:
+            summary = f"Successfully cloned {clone_data['repository_name']} on default branch '{final_branch}' (requested branch '{branch}' not found, {clone_data['commit_count']} commits) to temporary directory"
+        else:
+            summary = f"Successfully cloned {clone_data['repository_name']} on default branch '{final_branch}' ({clone_data['commit_count']} commits) to temporary directory"
         
         # Create metrics
         metrics = {

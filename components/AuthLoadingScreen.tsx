@@ -3,6 +3,7 @@ import {
   Waypoints,
   Sparkles,
   Flower,
+  Layers,
 } from "lucide-react";
 
 export const AuthLoadingScreen = () => {
@@ -12,8 +13,9 @@ export const AuthLoadingScreen = () => {
         <div className="flex items-center gap-2">
           <Sparkles size={32} />
           <Fingerprint size={32} />
-          <Waypoints size={32} />
           <Flower size={32} />
+          <Waypoints size={32} />
+          <Layers size={32} />
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />

@@ -22,11 +22,12 @@ def create_app() -> FastAPI:
     app.add_event_handler("startup", startup_event)
     app.add_event_handler("shutdown", shutdown_event)
     
-    from api import websocket, waypoint, github
+    from api import websocket, waypoint, github, veda
     app.include_router(cipher.router, tags=["cipher"])
     app.include_router(websocket.router, tags=["websocket"])
     app.include_router(waypoint.router, tags=["waypoint"])
     app.include_router(github.router, tags=["github"])
+    app.include_router(veda.router, tags=["veda"])
     
     return app
 

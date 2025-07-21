@@ -157,6 +157,54 @@ class PostPullRequestCommentResponse(BaseModel):
     """Response model for posting pull request comment"""
     comment: GitHubComment = Field(..., description="Created comment")
 
+# Veda API Models
+class VedaRequest(BaseModel):
+    """Request model for Veda comment analysis"""
+    pr_id: int = Field(..., description="Pull request ID")
+    repo_owner: str = Field(..., description="Repository owner")
+    repo_name: str = Field(..., description="Repository name")
+    user_comment: str = Field(..., min_length=1, description="User's comment/request")
+    user_login: str = Field(..., description="User login name")
+
+class VedaResponse(BaseModel):
+    """Response model for Veda comment analysis"""
+    task_id: str = Field(..., description="Unique task identifier for this analysis")
+    status: str = Field(..., description="Analysis status")
+    message: str = Field(..., description="Human-readable message")
+    analysis_started: bool = Field(..., description="Whether analysis has started")
+    estimated_completion_time: Optional[str] = Field(None, description="Estimated completion time")
+    websocket_url: Optional[str] = Field(None, description="WebSocket URL for real-time updates")
+
+# Apply Fixes Decomposition Models
+class FixResult(BaseModel):
+    """Result of AI fix planning"""
+    success: bool = Field(..., description="Whether AI could generate fixes")
+    updated_files: Dict[str, str] = Field(default_factory=dict, description="Filename to complete file content mapping")
+    fix_explanation: str = Field(..., description="Explanation of what was changed and why")
+    issues_addressed: int = Field(default=0, description="Number of issues addressed")
+    error_message: Optional[str] = Field(None, description="Error message if planning failed")
+
+class ValidationResult(BaseModel):
+    """Result of build validation"""
+    success: bool = Field(..., description="Whether validation passed")
+    duration: float = Field(..., description="Validation duration in seconds")
+    build_output: str = Field(default="", description="Combined output from go mod tidy and go build")
+    error_message: Optional[str] = Field(None, description="Error message if validation failed")
+    updated_go_sum: Optional[str] = Field(None, description="Updated go.sum content from go mod tidy")
+    warnings: List[str] = Field(default_factory=list, description="Non-fatal warnings")
+
+class AppliedFile(BaseModel):
+    """Successfully applied file change"""
+    file_path: str = Field(..., description="Path to the modified file")
+    action: str = Field(default="ai_generated_fix", description="Type of action performed")
+    status: str = Field(default="success", description="Status of the operation")
+
+class FailedFile(BaseModel):
+    """Failed file change attempt"""
+    file_path: str = Field(..., description="Path to the file that failed")
+    action: str = Field(default="ai_generated_fix", description="Type of action attempted")
+    error: str = Field(..., description="Error message")
+
 # Waypoint
 class WaypointNode(BaseModel):
     id: str

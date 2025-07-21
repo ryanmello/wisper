@@ -1,19 +1,24 @@
-import {
-  Fingerprint,
-  Flower,
-  Sparkles,
-  Waypoints,
-} from "lucide-react";
+"use client";
+
+import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
+import { useAuth } from "@/context/auth-context";
+import { Fingerprint, Flower, Layers, Sparkles, Waypoints } from "lucide-react";
 
 const Conscience = () => {
+  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+
+  if (isAuthLoading) return <AuthLoadingScreen />;
+  if (!isAuthenticated) return null;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 flex items-center justify-center">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
           <Sparkles size={32} />
           <Fingerprint size={32} />
           <Flower size={32} />
           <Waypoints size={32} />
+          <Layers size={32} />
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           <span
@@ -28,7 +33,7 @@ const Conscience = () => {
               animation: "rainbow 4s ease-in-out infinite",
             }}
           >
-            Verifying authentication...
+            Tapping into your conscience...
           </span>
         </div>
       </div>
@@ -49,4 +54,3 @@ const Conscience = () => {
 };
 
 export default Conscience;
-

@@ -13,57 +13,35 @@ from langchain_openai import ChatOpenAI
 logger = get_logger(__name__)
 
 @async_tool
-async def apply_fixes(repository_path: str, changes: str) -> StandardToolResponse:
-    """Apply file changes to repository based on analysis results and fix recommendations.
+async def apply_fixes(repository_path: str, prompt: str) -> StandardToolResponse:
+    """Apply file changes to Go repository based on human-readable prompt using AI analysis.
     
-    This tool applies structured changes to repository files. It handles both complete file 
-    operations (create/modify/delete), text-based modifications, and raw govulncheck output
-    for automatic Go vulnerability fixes using AI analysis.
+    This tool takes a human-readable description of desired changes and uses AI to analyze 
+    the repository context and implement the requested modifications. It handles any type 
+    of Go repository changes including dependency updates, code modifications, and vulnerability fixes.
     
-    Prerequisites: Repository must be cloned locally
+    Prerequisites: Repository must be cloned locally (Go repository)
     Often followed by: create_pull_request to commit and submit the applied changes
-    Compatible with: scan_go_vulnerabilities tool output can be passed directly as changes parameter
+    Compatible with: Human-readable prompts from Veda or raw govulncheck output
     
     Args:
-        repository_path: Path to the cloned repository where changes should be applied
-        changes: Either:
-                1. Raw govulncheck output string (detected automatically and processed by AI)
-                2. JSON string describing changes to apply:
-                   {"files": [{"path": "file.py", "action": "create|modify|delete", "content": "..."}]}
+        repository_path: Path to the cloned Go repository where changes should be applied
+        prompt: Human-readable description of desired changes, such as:
+               - "Update golang.org/x/net package from v0.34.0 to v0.42.0"
+               - "Fix the vulnerability in the authentication handler"
+               - Raw govulncheck output describing security issues
                 
     Returns:
         StandardToolResponse with applied changes status, files modified, and summary of operations
     """
     start_time = time.time()
-    logger.info(f"Applying changes to repository: {repository_path}")
+    logger.info(f"Applying changes to Go repository: {repository_path}")
+    logger.info(f"User prompt: {prompt}")
     
     try:
-        # Check if input is govulncheck output
-        if isinstance(changes, str) and _is_govulncheck_output(changes):
-            logger.info("Detected govulncheck output, using AI analysis to generate fixes...")
-            return await _handle_go_vulnerabilities_with_ai(repository_path, changes, start_time)
-        
-        # Handle structured changes (JSON format)
-        if isinstance(changes, str):
-            try:
-                changes = json.loads(changes)
-            except json.JSONDecodeError:
-                execution_time_ms = int((time.time() - start_time) * 1000)
-                return StandardToolResponse(
-                    status="error",
-                    tool_name="apply_fixes",
-                    data={"action": "validation_failed", "files_modified": 0, "files_failed": 0},
-                    error=StandardError(
-                        message="Invalid input format",
-                        details="Input must be either govulncheck output or valid JSON with change information",
-                        error_type="validation_error"
-                    ),
-                    summary="Change application failed - invalid input format",
-                    metrics=StandardMetrics(execution_time_ms=execution_time_ms)
-                )
-        
-        # Apply structured changes
-        return _apply_structured_changes(repository_path, changes, start_time)
+        # Always use AI analysis to process the human-readable prompt
+        logger.info("Processing prompt with AI analysis to generate fixes...")
+        return await _handle_go_changes_with_ai(repository_path, prompt, start_time)
         
     except Exception as e:
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -88,32 +66,17 @@ async def apply_fixes(repository_path: str, changes: str) -> StandardToolRespons
             )
         )
 
-def _is_govulncheck_output(text: str) -> bool:
-    """Detect if the input text is govulncheck output."""
-    patterns = [
-        r"Vulnerability #\d+:",
-        r"Found in:.*@",
-        r"Fixed in:.*@",
-        r"Your code is affected by \d+ vulnerabilities",
-        r"More info: https://pkg\.go\.dev/vuln/"
-    ]
-    
-    for pattern in patterns:
-        if re.search(pattern, text):
-            return True
-    return False
-
-async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_output: str, start_time: float) -> StandardToolResponse:
-    """Handle Go vulnerability fixes using AI analysis."""
+async def _handle_go_changes_with_ai(repository_path: str, prompt: str, start_time: float) -> StandardToolResponse:
+    """Handle Go repository changes using AI analysis."""
     try:
-        logger.info("Starting AI-based Go vulnerability analysis and fixing")
+        logger.info("Starting AI-based Go repository analysis and modification")
         
         # Read relevant files for AI context
-        file_contents = _read_relevant_files(repository_path, govulncheck_output)
+        file_contents = _read_go_repository_files(repository_path)
         logger.info(f"Read {len(file_contents)} files for AI context")
         
         # Send to AI for analysis
-        ai_response = await _send_to_ai(govulncheck_output, file_contents)
+        ai_response = await _send_to_ai(prompt, file_contents)
         logger.info("Received AI analysis response")
         logger.debug(f"Raw AI response: {ai_response}")
         
@@ -132,11 +95,11 @@ async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_o
                     "ai_explanation": fix_result.fix_explanation
                 },
                 error=StandardError(
-                    message="AI could not generate safe vulnerability fixes",
+                    message="AI could not generate safe repository changes",
                     details=fix_result.fix_explanation,
                     error_type="ai_analysis_error"
                 ),
-                summary="Go vulnerability fixing failed - AI could not generate safe fixes",
+                summary="Go repository modification failed - AI could not generate safe changes",
                 metrics=StandardMetrics(execution_time_ms=execution_time_ms)
             )
         
@@ -161,11 +124,11 @@ async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_o
                     "build_error": build_result.error_message
                 },
                 error=StandardError(
-                    message="AI-generated fixes failed build validation",
+                    message="AI-generated changes failed build validation",
                     details=f"Build validation failed: {build_result.error_message}",
                     error_type="build_validation_error"
                 ),
-                summary="Go vulnerability fixing failed - fixes would break the build",
+                summary="Go repository modification failed - changes would break the build",
                 metrics=StandardMetrics(execution_time_ms=execution_time_ms)
             )
         
@@ -219,18 +182,18 @@ async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_o
         
         # Create summary message
         if applied_files and not failed_files:
-            summary = f"Successfully applied AI-generated Go vulnerability fixes to {len(applied_files)} files"
+            summary = f"Successfully applied AI-generated Go repository changes to {len(applied_files)} files"
         elif applied_files and failed_files:
-            summary = f"Applied fixes to {len(applied_files)} files, {len(failed_files)} files failed"
+            summary = f"Applied changes to {len(applied_files)} files, {len(failed_files)} files failed"
         else:
-            summary = f"Failed to apply AI-generated fixes - {len(failed_files)} files failed"
+            summary = f"Failed to apply AI-generated changes - {len(failed_files)} files failed"
         
         # Prepare response data
         response_data = {
-            "action": "applied_ai_vulnerability_fixes",
+            "action": "applied_ai_repository_changes",
             "files_modified": len(applied_files),
             "files_failed": len(failed_files),
-            "vulnerabilities_addressed": fix_result.vulnerabilities_addressed,
+            "changes_made": fix_result.changes_made,
             "applied_files": applied_files,
             "failed_files": failed_files,
             "fix_explanation": fix_result.fix_explanation,
@@ -259,7 +222,7 @@ async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_o
             error=error_info,
             summary=summary,
             metrics=StandardMetrics(
-                items_processed=fix_result.vulnerabilities_addressed,
+                items_processed=fix_result.changes_made,
                 files_analyzed=len(applied_files) + len(failed_files),
                 execution_time_ms=execution_time_ms
             )
@@ -272,32 +235,30 @@ async def _handle_go_vulnerabilities_with_ai(repository_path: str, govulncheck_o
         return StandardToolResponse(
             status="error",
             tool_name="apply_fixes",
-            data={"action": "ai_vulnerability_error", "files_modified": 0, "files_failed": 0},
+            data={"action": "ai_processing_error", "files_modified": 0, "files_failed": 0},
             error=StandardError(
-                message=f"AI vulnerability processing failed: {str(e)}",
-                details="An error occurred while using AI to process govulncheck output and apply fixes",
-                error_type="ai_vulnerability_processing_error"
+                message=f"AI repository processing failed: {str(e)}",
+                details="An error occurred while using AI to process the prompt and apply changes",
+                error_type="ai_processing_error"
             ),
-            summary="AI-based Go vulnerability fix application failed",
+            summary="AI-based Go repository modification failed",
             metrics=StandardMetrics(execution_time_ms=execution_time_ms)
         )
 
-def _read_relevant_files(repository_path: str, govulncheck_output: str) -> Dict[str, str]:
-    """Read files that are relevant for AI analysis of Go vulnerabilities."""
+def _read_go_repository_files(repository_path: str) -> Dict[str, str]:
+    """Read relevant Go repository files for AI analysis."""
     files_to_read = []
     file_contents = {}
     
-    files = ["go.mod", "go.sum"]
+    # Only include Go module files
+    essential_files = ["go.mod", "go.sum"]
     
-    for file_path in files:
+    for file_path in essential_files:
         full_path = os.path.join(repository_path, file_path)
         if os.path.exists(full_path):
             try:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    # Limit file size to prevent token overflow
-                    if len(content) > 10000:  # Limit to ~10KB per file
-                        content = content[:10000] + "\n... [truncated due to size] ..."
                     file_contents[file_path] = content
                     files_to_read.append(file_path)
                     logger.info(f"Read file {file_path} ({len(content)} chars)")
@@ -308,75 +269,79 @@ def _read_relevant_files(repository_path: str, govulncheck_output: str) -> Dict[
     logger.info(f"Successfully read {len(file_contents)} files: {files_to_read}")
     return file_contents
 
-async def _send_to_ai(govulncheck_output: str, file_contents: Dict[str, str]) -> str:
-    """Send vulnerability data to AI for analysis and fix generation."""
+async def _send_to_ai(prompt: str, file_contents: Dict[str, str]) -> str:
+    """Send prompt and repository context to AI for analysis and change generation."""
     files_section = ""
     for file_path, content in file_contents.items():
         files_section += f"\n--- {file_path} ---\n{content}\n"
     
-    system_prompt = """You are a Go security expert specializing in fixing vulnerabilities.
+    system_prompt = """You are a Go development expert specializing in repository modifications.
 
-    Your task is to analyze govulncheck output and fix the identified vulnerabilities by updating the necessary files.
+    CRITICAL: YOU MUST PRESERVE ALL EXISTING DEPENDENCIES - NEVER REMOVE ANY require ENTRIES!
 
-    IMPORTANT RULES:
-    1. Focus on dependency updates in go.mod when possible (safest approach)
-    2. Only modify source code if absolutely necessary for the fix
-    3. Provide the complete updated file content for each file you modify
-    4. Explain your reasoning for each change
-    5. Be conservative - prefer minimal changes that fix the vulnerability
-    6. If some vulnerabilities cannot be safely fixed, explain why
+    CORE RULES:
+    1. PRESERVE ALL existing dependencies (never remove require entries) - THIS IS MANDATORY
+    2. Make minimal, targeted changes that fulfill the user's request
+    3. For dependency updates: modify go.mod safely without removing other dependencies
+    4. For code changes: modify only the necessary files and functions
+    5. Always provide complete file content for any file you modify
+    6. Be conservative - prefer safe, minimal changes
 
-    You can fix these types of vulnerabilities:
+    GO.MOD REQUIREMENTS (when modifying go.mod):
+    - PRESERVE ALL existing dependencies (never remove require entries) - CRITICAL
+    - Provide COMPLETE go.mod structure (module, go version, require blocks)
+    - Update versions in require sections (avoid replace directives)
+    - Maintain proper formatting and indentation
+    - Include ALL dependencies from the original file, even if not being updated
 
-    1. **STANDARD LIBRARY vulnerabilities** (syscall, crypto/x509, net/http, etc.):
-    - Fix by updating the Go version in go.mod (e.g., "go 1.24.4")
-    - Example: syscall@go1.24.2 → Fixed in: syscall@go1.24.4 means update to "go 1.24.4"
+    TYPES OF CHANGES YOU CAN HANDLE:
+    - Dependency updates (update specific packages in go.mod)
+    - Security vulnerability fixes (update vulnerable dependencies)
+    - Code modifications (add/modify/fix Go source code)
+    - Configuration changes (update Go version, add new dependencies)
+    - Bug fixes and feature implementations
 
-    2. **MODULE DEPENDENCY vulnerabilities** (golang.org/x/net, etc.):
-    - Fix by updating dependency versions in the require section
-    - Example: golang.org/x/net@v0.34.0 → Fixed in: v0.38.0 means update to "golang.org/x/net v0.38.0"
+    OUTPUT: Return valid JSON only, no extra text.
 
-    GO MODULE NOTES:
-    - When updating dependencies in go.mod, the system will automatically run 'go mod tidy' if needed to resolve go.sum entries
-    - This means you can safely update go.mod dependencies and the build validation will handle go.sum updates
-    - Focus on providing clean, minimal go.mod updates
-
-    IMPORTANT: Only apply fixes that you are confident are safe and won't break the build.
-    ALWAYS return valid JSON - no extra text outside the JSON block
-
-    Output Format - MUST be valid JSON:
+    Success format:
     ```json
     {
         "success": true,
         "updated_files": {
-            "go.mod": "module example.com/myapp\\n\\ngo 1.24.4\\n\\nrequire (\\n\\tgolang.org/x/net v0.38.0\\n\\tother-dependency v1.2.3\\n)"
+            "filename.go": "package main\\n\\nfunc main() {\\n\\t// updated code\\n}",
+            "go.mod": "module example\\n\\ngo 1.24.4\\n\\nrequire (\\n\\tgithub.com/existing/dep1 v1.2.3\\n\\tgolang.org/x/net v0.38.0\\n\\tgithub.com/another/dep v1.0.0\\n)"
         },
-        "fix_explanation": "Updated Go version to 1.24.4 to fix syscall and crypto/x509 vulnerabilities. Updated golang.org/x/net to v0.38.0 to fix HTML injection vulnerability. All 3 vulnerabilities have been addressed.",
-        "vulnerabilities_addressed": 3
+        "fix_explanation": "Brief explanation of changes made",
+        "changes_made": 2
     }
     ```
 
-    If you cannot fix the vulnerabilities safely, return:
+    Failure format:
     ```json
     {
         "success": false,
         "updated_files": {},
-        "fix_explanation": "Explanation of why fixes cannot be applied safely",
-        "vulnerabilities_addressed": 0
+        "fix_explanation": "Why changes cannot be applied safely",
+        "changes_made": 0
     }
     ```"""
 
-    human_prompt = f"""Please analyze this govulncheck output and fix the vulnerabilities:
+    human_prompt = f"""Please analyze the user's request and implement the requested changes:
 
-    GOVULNCHECK OUTPUT:
-    {govulncheck_output}
+    USER REQUEST:
+    {prompt}
 
-    CURRENT FILES:
+    CURRENT REPOSITORY FILES:
     {files_section}
+    
+    Please implement the requested changes following the conservative approach outlined in the system prompt. 
+    Focus on making minimal, safe changes that fulfill the user's request.
+    
+    If this is a dependency update request, modify go.mod while preserving all existing dependencies.
+    If this is a code change request, modify only the necessary source files.
+    If this is govulncheck output, treat it as a security vulnerability fix request.
 
-    Please provide safe fixes following the conservative approach outlined in the system prompt. Focus on dependency updates in go.mod when possible, and only modify other files if absolutely necessary for the fix.
-
-    Please provide fixes following the JSON format specified in the system prompt."""
+    Please provide the changes following the JSON format specified in the system prompt."""
 
     messages = [
         SystemMessage(content=system_prompt),
@@ -395,13 +360,13 @@ async def _send_to_ai(govulncheck_output: str, file_contents: Dict[str, str]) ->
     return response.content
 
 class FixResult:
-    """Result of AI vulnerability fix analysis."""
+    """Result of AI repository change analysis."""
     def __init__(self, success: bool, updated_files: Dict[str, str], fix_explanation: str, 
-                 vulnerabilities_addressed: int, error_message: str = None):
+                changes_made: int, error_message: str = None):
         self.success = success
         self.updated_files = updated_files
         self.fix_explanation = fix_explanation
-        self.vulnerabilities_addressed = vulnerabilities_addressed
+        self.changes_made = changes_made
         self.error_message = error_message
 
 def _parse_ai_response(ai_response: str) -> FixResult:
@@ -421,7 +386,7 @@ def _parse_ai_response(ai_response: str) -> FixResult:
             success=data.get("success", False),
             updated_files=data.get("updated_files", {}),
             fix_explanation=data.get("fix_explanation", ""),
-            vulnerabilities_addressed=data.get("vulnerabilities_addressed", 0)
+            changes_made=data.get("changes_made", 0)
         )
         
     except Exception as e:
@@ -432,123 +397,7 @@ def _parse_ai_response(ai_response: str) -> FixResult:
             success=False,
             updated_files={},
             fix_explanation=f"Failed to parse AI response: {str(e)}",
-            vulnerabilities_addressed=0,
+            changes_made=0,
             error_message=str(e)
         )
 
-def _apply_structured_changes(repository_path: str, changes: dict, start_time: float) -> StandardToolResponse:
-    """Apply structured changes from JSON format."""
-    applied_files = []
-    failed_files = []
-    
-    # Validate changes structure
-    if not changes or not isinstance(changes, dict) or "files" not in changes:
-        execution_time_ms = int((time.time() - start_time) * 1000)
-        return StandardToolResponse(
-            status="error",
-            tool_name="apply_fixes",
-            data={"action": "validation_failed", "files_modified": 0, "files_failed": 0},
-            error=StandardError(
-                message="Invalid changes format",
-                details="Changes must be a dictionary with 'files' key containing file operations",
-                error_type="validation_error"
-            ),
-            summary="Change application failed - invalid format",
-            metrics=StandardMetrics(execution_time_ms=execution_time_ms)
-        )
-    
-    # Handle file operations
-    logger.info(f"Processing {len(changes['files'])} file operations")
-    
-    for file_change in changes["files"]:
-        file_path = file_change["path"]
-        action = file_change["action"]
-        
-        try:
-            full_path = os.path.join(repository_path, file_path)
-            
-            if action in ["create", "modify"]:
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                
-                # Write new content
-                with open(full_path, 'w', encoding='utf-8') as f:
-                    f.write(file_change["content"])
-                
-                applied_files.append({
-                    "file": file_path,
-                    "action": action,
-                    "status": "success"
-                })
-                logger.info(f"Applied {action} to {file_path}")
-                
-            elif action == "delete":
-                if os.path.exists(full_path):
-                    os.remove(full_path)
-                    applied_files.append({
-                        "file": file_path,
-                        "action": "delete",
-                        "status": "success"
-                    })
-                    logger.info(f"Deleted {file_path}")
-                else:
-                    logger.warning(f"File {file_path} does not exist, skipping deletion")
-            
-        except Exception as e:
-            logger.error(f"Failed to apply {action} to {file_path}: {e}")
-            failed_files.append({
-                "file": file_path,
-                "action": action,
-                "error": str(e)
-            })
-    
-    # Calculate execution time and create response
-    execution_time_ms = int((time.time() - start_time) * 1000)
-    
-    # Determine status
-    if failed_files and applied_files:
-        status = "partial_success"
-    elif failed_files:
-        status = "error"
-    else:
-        status = "success"
-    
-    # Create summary message
-    if applied_files and not failed_files:
-        summary = f"Successfully applied changes to {len(applied_files)} files"
-    elif applied_files and failed_files:
-        summary = f"Applied changes to {len(applied_files)} files, {len(failed_files)} files failed"
-    else:
-        summary = f"Failed to apply changes - {len(failed_files)} files failed"
-    
-    # Prepare response data
-    response_data = {
-        "action": "applied_structured_changes",
-        "files_modified": len(applied_files),
-        "files_failed": len(failed_files),
-        "applied_files": applied_files,
-        "failed_files": failed_files
-    }
-    
-    # Add error information if there were failures
-    error_info = None
-    if failed_files:
-        error_details = f"Failed to apply changes to {len(failed_files)} files"
-        error_info = StandardError(
-            message="Some file changes failed to apply",
-            details=error_details,
-            error_type="file_operation_error"
-        )
-    
-    return StandardToolResponse(
-        status=status,
-        tool_name="apply_fixes",
-        data=response_data,
-        error=error_info,
-        summary=summary,
-        metrics=StandardMetrics(
-            items_processed=len(applied_files) + len(failed_files),
-            files_analyzed=len(applied_files) + len(failed_files),
-            execution_time_ms=execution_time_ms
-        )
-    ) 
