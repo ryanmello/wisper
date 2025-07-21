@@ -165,7 +165,7 @@ class AnalysisService:
             task_id=task_id,
             progress=ProgressInfo(
                 percentage=self._estimate_progress(update),
-                current_step="Analysis",
+                current_step="Processing",
                 step_number=turn,
                 total_steps=self.total_steps
             ),

@@ -64,6 +64,7 @@ export default function Veda() {
   // WebSocket state for Veda analysis
   const [vedaWebSocket, setVedaWebSocket] = useState<WebSocket | null>(null);
   const [vedaAnalysisProgress, setVedaAnalysisProgress] = useState<string>("");
+  const [vedaAnalysisCompleted, setVedaAnalysisCompleted] = useState<boolean>(false);
 
   // Fetch user repositories on component mount
   useEffect(() => {
@@ -103,6 +104,15 @@ export default function Veda() {
     setFileChanges([]);
     setComments([]);
     setPullRequests([]);
+    setVedaAnalysisCompleted(false); // Reset analysis completion state
+    setVedaAnalysisProgress(""); // Reset analysis progress
+    
+    // Close existing WebSocket connection
+    if (vedaWebSocket) {
+      vedaWebSocket.close();
+      setVedaWebSocket(null);
+    }
+    
     await fetchPullRequests(repo);
   };
 
@@ -132,6 +142,15 @@ export default function Veda() {
   const handlePRSelection = async (pr: GitHubPullRequest) => {
     setSelectedPR(pr);
     setExpandedFiles(new Set()); // Reset expanded files when switching PRs
+    setVedaAnalysisCompleted(false); // Reset analysis completion state
+    setVedaAnalysisProgress(""); // Reset analysis progress
+    
+    // Close existing WebSocket connection
+    if (vedaWebSocket) {
+      vedaWebSocket.close();
+      setVedaWebSocket(null);
+    }
+    
     setLoading(true);
     await Promise.all([fetchFileChanges(pr), fetchComments(pr)]);
     setLoading(false);
@@ -166,6 +185,25 @@ export default function Veda() {
       setExpandedFiles(allFileIndexes);
     } catch (err) {
       console.error("Error fetching file changes:", err);
+    }
+  };
+
+  // Refresh file changes after Veda analysis completion
+  const refreshFileChanges = async () => {
+    if (!selectedPR) return;
+    
+    setLoading(true);
+    setVedaAnalysisCompleted(false);
+    setVedaAnalysisProgress("");
+    
+    try {
+      await fetchFileChanges(selectedPR);
+      await fetchComments(selectedPR);
+    } catch (err) {
+      console.error("Error refreshing file changes:", err);
+      setError("Failed to refresh file changes");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -204,7 +242,10 @@ export default function Veda() {
     const currentCommentText = newComment;
     setComments([...comments, skeletonComment]);
     setNewComment("");
-    setLoading(true);
+    
+    // Reset analysis completion state when starting new analysis
+    setVedaAnalysisCompleted(false);
+    setError(null);
 
     try {
       // Make both API calls simultaneously
@@ -230,9 +271,6 @@ export default function Veda() {
           comment.id === tempId ? githubResponse.comment : comment
         )
       );
-
-      // Log Veda analysis response
-      console.log("Veda analysis started:", vedaResponse);
 
       // Connect to WebSocket for real-time updates if available
       if (vedaResponse.websocket_url) {
@@ -275,16 +313,27 @@ export default function Veda() {
           const message = JSON.parse(event.data);
           console.log("Veda analysis update:", message);
 
-          if (message.type === "progress" && message.progress) {
-            setVedaAnalysisProgress(message.progress.current_step);
+          if (message.type === "tool_started" && message.tool?.name) {
+            setVedaAnalysisProgress(`Starting ${message.tool.name}...`);
+          } else if (message.type === "tool_completed" && message.tool?.name) {
+            setVedaAnalysisProgress(`Completed ${message.tool.name}`);
+          } else if (message.type === "progress" && message.progress) {
+            // Check if there's tool information in progress messages
+            if (message.tool?.name) {
+              setVedaAnalysisProgress(`${message.tool.name}: ${message.progress.current_step}`);
+            } else {
+              setVedaAnalysisProgress(message.progress.current_step);
+            }
           } else if (message.type === "analysis_completed") {
             setVedaAnalysisProgress("Analysis completed!");
+            setVedaAnalysisCompleted(true);
             // Optionally refresh comments to see any new ones from Veda
             if (selectedPR) {
               fetchComments(selectedPR);
             }
           } else if (message.type === "analysis_error") {
             setVedaAnalysisProgress("Analysis failed");
+            setVedaAnalysisCompleted(false);
             setError("Veda analysis failed: " + (message.error?.message || "Unknown error"));
           }
         } catch (err) {
@@ -655,12 +704,40 @@ export default function Veda() {
               <div className="border-t border-gray-100 p-4 bg-white rounded-b-xl">
                 {/* Veda Analysis Progress */}
                 {vedaAnalysisProgress && (
-                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-blue-700 text-sm font-medium">
-                        {vedaAnalysisProgress}
-                      </span>
+                  <div className={`mb-3 p-3 rounded-lg ${
+                    vedaAnalysisCompleted 
+                      ? 'bg-green-50 border border-green-200' 
+                      : 'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        {!vedaAnalysisCompleted && (
+                          <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                        {vedaAnalysisCompleted && (
+                          <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                        <span className={`text-sm font-medium ${
+                          vedaAnalysisCompleted ? 'text-green-700' : 'text-blue-700'
+                        }`}>
+                          {vedaAnalysisProgress}
+                        </span>
+                      </div>
+                      
+                      {vedaAnalysisCompleted && (
+                        <Button
+                          onClick={refreshFileChanges}
+                          disabled={loading}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 h-7"
+                        >
+                          {loading ? "Refreshing..." : "Refresh Changes"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -688,7 +765,7 @@ export default function Veda() {
                     disabled={!selectedPR || !newComment.trim() || loading}
                     className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Flower className="w-4 h-4 mr-2" />
+                    <Flower className="w-4 h-4" />
                     {loading ? "Sending..." : "Ask Veda"}
                   </Button>
                   {error && (
