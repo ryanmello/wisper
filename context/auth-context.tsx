@@ -31,18 +31,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch user data from GitHub API
+  // Fetch user data from backend API
   const fetchUser = async (token: string): Promise<GitHubUser | null> => {
     try {
-      const response = await fetch("https://api.github.com/user", {
+      const response = await fetch("http://localhost:8000/user", {
+        method: "POST",
         headers: {
-          Authorization: `token ${token}`,
-          Accept: "application/vnd.github.v3+json",
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ token }),
       });
 
       if (response.ok) {
-        return await response.json();
+        const body = await response.json()
+        console.log(body)
+        return body;
       }
       return null;
     } catch (error) {

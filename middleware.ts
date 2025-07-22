@@ -1,49 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Routes that require authentication
-const protectedRoutes = ["/", "/cipher", "/waypoint", "/veda", "/playbook"];
-
-// Routes that should redirect authenticated users
-const authRoutes = ["/sign-in"];
+// truly public (no auth) pages
+const PUBLIC_PATHS = ["/docs"] as const;
+const SIGN_IN_PATH  = "/sign-in";
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // Get the token from cookies (we'll need to set this when user logs in)
+  const { pathname, searchParams } = request.nextUrl;
   const token = request.cookies.get("github_token")?.value;
 
-  // Check if the current path is protected
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  // 1️⃣ Allow the public docs
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
 
-  // Check if the current path is an auth route
-  const isAuthRoute = authRoutes.some((route) => pathname.startsWith(route));
+  // 2️⃣ Handle the sign‑in page itself
+  if (pathname.startsWith(SIGN_IN_PATH)) {
+    // If already signed in, send them back to where they came from (or /)
+    if (token) {
+      const dest = searchParams.get("callbackUrl") || "/";
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+    // otherwise just let them see the sign‑in form
+    return NextResponse.next();
+  }
 
-  // If it's a protected route and no token, redirect to sign-in
-  if (isProtectedRoute && !token) {
-    const signInUrl = new URL("/sign-in", request.url);
+  // 3️⃣ Everything else (including "/") is protected
+  if (!token) {
+    const signInUrl = new URL(SIGN_IN_PATH, request.url);
     signInUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(signInUrl);
   }
 
-  // If it's an auth route and user has token, redirect to tasks
-  if (isAuthRoute && token) {
-    return NextResponse.redirect(new URL("/cipher", request.url));
-  }
-
+  // 4️⃣ Authenticated users get free passage
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|auth/callback).*)",
   ],
 };

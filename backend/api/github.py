@@ -1,7 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from typing import Optional, List
 from utils.logging_config import get_logger
-from services.github_service import github_service
 from config.settings import settings
 from models.api_models import (
     GetRepositoriesRequest, GetRepositoriesResponse, GitHubRepository,
@@ -9,12 +7,48 @@ from models.api_models import (
     GetPullRequestFilesRequest, GetPullRequestFilesResponse, GitHubFileChange,
     GetPullRequestCommentsRequest, GetPullRequestCommentsResponse, GitHubComment,
     PostPullRequestCommentRequest, PostPullRequestCommentResponse,
-    GitHubUser, GitHubLabel
+    GitHubUser, GitHubLabel, GetUserRequest
 )
 import httpx
+from config.settings import settings
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+@router.post("/user", response_model=GitHubUser)
+async def get_user(request: GetUserRequest):
+    try:
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
+        
+        token = request.token
+        url = f"{settings.GITHUB_API_URL}/user"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+
+            if response.status_code == 401:
+                raise HTTPException(status_code=401, detail="Invalid GitHub token")
+            elif response.status_code != 200:
+                logger.error(f"GitHub API error: {response.status_code} - {response.text}")
+                raise HTTPException(status_code=response.status_code, detail="Failed to fetch user")
+            
+            user_data = response.json()
+            return GitHubUser(
+                login=user_data["login"],
+                avatar_url=user_data["avatar_url"],
+                name=user_data.get("name")
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching repositories: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/repositories", response_model=GetRepositoriesResponse)
 async def get_user_repositories(request: GetRepositoriesRequest):
@@ -29,7 +63,7 @@ async def get_user_repositories(request: GetRepositoriesRequest):
         token = settings.GITHUB_TOKEN
         
         # GitHub API endpoint for user repositories
-        url = "https://api.github.com/user/repos"
+        url = f"{settings.GITHUB_API_URL}/user/repos"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json"
@@ -98,7 +132,7 @@ async def get_pull_requests(request: GetPullRequestsRequest):
         token = settings.GITHUB_TOKEN
         
         # GitHub API endpoint for repository pull requests
-        url = f"https://api.github.com/repos/{request.repo_owner}/{request.repo_name}/pulls"
+        url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/pulls"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json"
@@ -141,7 +175,8 @@ async def get_pull_requests(request: GetPullRequestsRequest):
                     html_url=pr["html_url"],
                     user=GitHubUser(
                         login=pr["user"]["login"],
-                        avatar_url=pr["user"]["avatar_url"]
+                        avatar_url=pr["user"]["avatar_url"],
+                        name=pr["user"]["name"]
                     ),
                     comments=pr.get("comments", 0),
                     labels=[GitHubLabel(name=label["name"], color=label["color"]) for label in pr.get("labels", [])]
@@ -174,7 +209,7 @@ async def get_pull_request_files(request: GetPullRequestFilesRequest):
         token = settings.GITHUB_TOKEN
         
         # GitHub API endpoint for PR files
-        url = f"https://api.github.com/repos/{request.repo_owner}/{request.repo_name}/pulls/{request.pr_id}/files"
+        url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/pulls/{request.pr_id}/files"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json"
@@ -233,7 +268,7 @@ async def get_pull_request_comments(request: GetPullRequestCommentsRequest):
         token = settings.GITHUB_TOKEN
         
         # GitHub API endpoint for PR comments
-        url = f"https://api.github.com/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"
+        url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json"
@@ -263,7 +298,8 @@ async def get_pull_request_comments(request: GetPullRequestCommentsRequest):
                     body=comment["body"],
                     user=GitHubUser(
                         login=comment["user"]["login"],
-                        avatar_url=comment["user"]["avatar_url"]
+                        avatar_url=comment["user"]["avatar_url"],
+                        name=comment["user"]["name"]
                     ),
                     created_at=comment["created_at"],
                     updated_at=comment["updated_at"],
@@ -298,7 +334,7 @@ async def post_pull_request_comment(request: PostPullRequestCommentRequest):
         token = settings.GITHUB_TOKEN
         
         # GitHub API endpoint for posting PR comments
-        url = f"https://api.github.com/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"
+        url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github.v3+json",
@@ -325,7 +361,8 @@ async def post_pull_request_comment(request: PostPullRequestCommentRequest):
                 body=comment["body"],
                 user=GitHubUser(
                     login=comment["user"]["login"],
-                    avatar_url=comment["user"]["avatar_url"]
+                    avatar_url=comment["user"]["avatar_url"],
+                    name=comment["user"]["name"]
                 ),
                 created_at=comment["created_at"],
                 updated_at=comment["updated_at"],

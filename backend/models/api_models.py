@@ -32,6 +32,16 @@ class AIAnalysisResponse(BaseModel):
     message: str = Field(..., description="Status message")
 
 # GitHub API Models
+class GetUserRequest(BaseModel):
+    """Request model for getting GitHub user information"""
+    token: str = Field(..., description="GitHub personal access token")
+
+class GitHubUser(BaseModel):
+    """GitHub user information"""
+    login: str = Field(..., description="User login name")
+    avatar_url: str = Field(..., description="User avatar URL")
+    name: Optional[str] = Field(None, description="User public name")
+
 class GitHubRepository(BaseModel):
     """GitHub repository information"""
     id: int = Field(..., description="Repository ID")
@@ -57,11 +67,6 @@ class GetRepositoriesResponse(BaseModel):
     repositories: List[GitHubRepository] = Field(..., description="List of repositories")
     page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Number of repositories per page")
-
-class GitHubUser(BaseModel):
-    """GitHub user information"""
-    login: str = Field(..., description="User login name")
-    avatar_url: str = Field(..., description="User avatar URL")
 
 class GitHubLabel(BaseModel):
     """GitHub label information"""

@@ -79,7 +79,7 @@ async def _fetch_pr_context(repo_owner: str, repo_name: str, pr_id: int) -> dict
     
     async with httpx.AsyncClient() as client:
         # Fetch PR metadata
-        pr_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
+        pr_url = f"{settings.GITHUB_API_URL}/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
         pr_response = await client.get(pr_url, headers=headers)
         
         if pr_response.status_code != 200:
@@ -88,7 +88,7 @@ async def _fetch_pr_context(repo_owner: str, repo_name: str, pr_id: int) -> dict
         pr_data = pr_response.json()
         
         # Fetch PR files
-        files_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_id}/files"
+        files_url = f"{settings.GITHUB_API_URL}/repos/{repo_owner}/{repo_name}/pulls/{pr_id}/files"
         files_response = await client.get(files_url, headers=headers)
         
         if files_response.status_code != 200:

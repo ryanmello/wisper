@@ -1,4 +1,3 @@
-import asyncio
 from typing import AsyncGenerator
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
@@ -19,9 +18,10 @@ class Orchestrator:
         
         self.tools_map = {tool.name: tool for tool in ALL_TOOLS}
         self.system_prompt = """
-                             You are an expert repository analysis and automation assistant. 
-                             Your job is to help users analyze code repositories and automate development workflows.
-                             You MUST immediately execute tools to fulfill user requests - never just describe or plan what you will do.
+                             You are an expert Go repository vulnerability detection and automation assistant. 
+                             Your role is to identify vulnerabilities in repositories, fix vulnerabilities by updating go.mod and go.sum files, 
+                             and automate development workflows.
+                             You MUST immediately execute tools to fulfill user requests. Never just describe or plan what you will do.
                              Use available tools to fulfill the user's request completely.
                              """
 
@@ -32,17 +32,17 @@ class Orchestrator:
             "tools_executed": 0,
             "tool_results": {},
             "errors": [],
-            "sent_ai_messages": set()
+            "llm_responses": set()
         }
         
         messages = [
             SystemMessage(content=self.system_prompt),
             HumanMessage(content=f"""
                 User Request: {user_prompt}
-                Repository URL: {repository_url}""")
+                GitHub Repository URL: {repository_url}""")
         ]
         
-        max_turns = 12
+        max_turns = 10
         
         for turn in range(max_turns):
             try:
@@ -51,8 +51,8 @@ class Orchestrator:
                 response = await self.llm.ainvoke(messages)
                 messages.append(response)
                 
-                if response.content and response.content not in execution_state["sent_ai_messages"]:
-                    execution_state["sent_ai_messages"].add(response.content)
+                if response.content and response.content not in execution_state["llm_responses"]:
+                    execution_state["llm_responses"].add(response.content)
                     yield OrchestratorUpdate.content(
                         message=response.content,
                         turn=turn + 1
@@ -141,7 +141,6 @@ class Orchestrator:
                 )
                 break
         
-        # completed {max_turns} turns without breaking
         else:
             yield OrchestratorUpdate.completed(
                 message=f"Analysis completed after {max_turns} turns with {execution_state['tools_executed']} tools executed.",

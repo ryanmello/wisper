@@ -19,6 +19,7 @@ import {
   Settings,
   Fingerprint,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 
 export default function SignInPage() {
@@ -47,7 +48,7 @@ export default function SignInPage() {
         
         // Redirect to main application
         setTimeout(() => {
-          router.push("/cipher");
+          router.push("/");
         }, 1500);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -99,11 +100,11 @@ export default function SignInPage() {
         <div className="w-full max-w-md mx-auto">
           <div className="text-center space-y-4">
             <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-800 rounded-2xl flex items-center justify-center mx-auto shadow-xl">
-              <Fingerprint className="w-10 h-10 text-white" />
+              <Sparkles className="w-10 h-10 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Cipher
+                Conscience
               </h1>
               <div className="flex items-center justify-center space-x-2">
                 <LoadingSpinner size="sm" />
@@ -153,7 +154,7 @@ export default function SignInPage() {
           {/* Header */}
           <div className="text-center space-y-4">
             <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-800 rounded-2xl flex items-center justify-center mx-auto shadow-xl">
-              <Fingerprint className="w-10 h-10 text-white" />
+              <Sparkles className="w-10 h-10 text-white" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -253,11 +254,11 @@ export default function SignInPage() {
         {/* Header */}
         <div className="text-center space-y-4">
           <div className="w-20 h-20 bg-gradient-to-br from-black to-gray-800 rounded-2xl flex items-center justify-center mx-auto shadow-xl">
-            <Fingerprint className="w-10 h-10 text-white" />
+            <Sparkles className="w-10 h-10 text-white" />
           </div>
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Sign in to Cipher
+              Sign in to Conscience
             </h1>
             <p className="text-lg text-muted-foreground">
               Connect your GitHub account to get started

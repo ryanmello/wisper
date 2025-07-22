@@ -31,6 +31,7 @@ export interface GetRepositoriesResponse {
 export interface GitHubUser {
   login: string;
   avatar_url: string;
+  name: string;
 }
 
 export interface GitHubLabel {

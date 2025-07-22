@@ -2,15 +2,24 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { CheckCircle, AlertCircle, Loader2, Sparkles } from "lucide-react";
 
 function GitHubCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error">(
+    "loading"
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,7 +53,9 @@ function GitHubCallbackContent() {
 
         if (!tokenResponse.ok) {
           const errorData = await tokenResponse.json();
-          throw new Error(errorData.error || "Failed to exchange authorization code for token");
+          throw new Error(
+            errorData.error || "Failed to exchange authorization code for token"
+          );
         }
 
         const tokenData = await tokenResponse.json();
@@ -56,16 +67,17 @@ function GitHubCallbackContent() {
 
           // Redirect back to main app after a short delay
           setTimeout(() => {
-            router.push("/cipher");
+            router.push("/");
           }, 2000);
         } catch (loginError) {
-          console.error(loginError)
+          console.error(loginError);
           throw new Error("Failed to authenticate with GitHub");
         }
-
       } catch (err) {
         console.error("OAuth callback error:", err);
-        setError(err instanceof Error ? err.message : "An unknown error occurred");
+        setError(
+          err instanceof Error ? err.message : "An unknown error occurred"
+        );
         setStatus("error");
       }
     };
@@ -74,50 +86,49 @@ function GitHubCallbackContent() {
   }, [searchParams, router]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md border-0 shadow-lg py-8">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">W</span>
+          <div className="mx-auto mb-6 w-14 h-14 bg-gray-900 rounded-xl flex items-center justify-center">
+            <Sparkles className="w-7 h-7 text-white" />
           </div>
-          <CardTitle className="text-2xl">
-            {status === "loading" && "Connecting to GitHub..."}
+          <CardTitle className="text-xl font-semibold text-gray-900">
+            {status === "loading" && "Connecting to GitHub"}
             {status === "success" && "Successfully Connected!"}
             {status === "error" && "Connection Failed"}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-gray-600 text-sm">
             {status === "loading" && "Processing your GitHub authorization..."}
-                            {status === "success" && "Redirecting you back to Cipher..."}
-            {status === "error" && "There was an issue connecting your GitHub account."}
+            {status === "success" && "Redirecting you back to Conscience..."}
+            {status === "error" &&
+              "There was an issue connecting your GitHub account."}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
           {status === "loading" && (
             <div className="flex items-center justify-center">
-              <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+              <Loader2 className="w-8 h-8 animate-spin text-gray-900" />
             </div>
           )}
-          
+
           {status === "success" && (
-            <div className="text-green-600">
-              <svg className="w-16 h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <p className="text-gray-600">Your GitHub account has been successfully connected!</p>
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
             </div>
           )}
-          
+
           {status === "error" && (
-            <div className="text-red-600">
-              <svg className="w-16 h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <p className="text-gray-600 mb-4">{error}</p>
-              <Button 
-                onClick={() => router.push("/")}
-                className="transition-colors"
-              >
-                Return to Cipher
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+              <p className="text-gray-700 mb-6 text-sm leading-relaxed bg-gray-50 p-4 rounded-lg">
+                {error}
+              </p>
+              <Button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-2 rounded-lg transition-colors">
+                Return to Conscience
               </Button>
             </div>
           )}
@@ -129,22 +140,26 @@ function GitHubCallbackContent() {
 
 export default function GitHubCallback() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-12 h-12 bg-black rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-xl">W</span>
-            </div>
-            <CardTitle className="text-2xl">Loading...</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-          </CardContent>
-        </Card>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border-0 shadow-lg py-8">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-6 w-14 h-14 bg-gray-900 rounded-xl flex items-center justify-center">
+                <Sparkles className="w-7 h-7 text-white" />
+              </div>
+              <CardTitle className="text-xl font-semibold text-gray-900">
+                Loading...
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-gray-900 mx-auto" />
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
       <GitHubCallbackContent />
     </Suspense>
   );
-} 
+}

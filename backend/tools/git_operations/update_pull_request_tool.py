@@ -5,7 +5,6 @@ from utils.async_tool_decorator import async_tool
 from utils.tool_metadata_decorator import tool_category
 from utils.logging_config import get_logger
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
-from services.github_service import github_service
 from config.settings import settings
 
 logger = get_logger(__name__)
@@ -189,8 +188,7 @@ async def update_pull_request(
             metrics=StandardMetrics(execution_time_ms=execution_time_ms)
         )
 
-async def _update_pr_metadata(repo_owner: str, repo_name: str, pr_id: int, 
-                             title: Optional[str], description: Optional[str]) -> Dict:
+async def _update_pr_metadata(repo_owner: str, repo_name: str, pr_id: int, title: Optional[str], description: Optional[str]) -> Dict:
     """Update PR title and/or description"""
     import httpx
     
@@ -210,7 +208,7 @@ async def _update_pr_metadata(repo_owner: str, repo_name: str, pr_id: int,
         update_data["body"] = description
     
     async with httpx.AsyncClient() as client:
-        url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
+        url = f"{settings.GITHUB_API_URL}/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
         response = await client.patch(url, headers=headers, json=update_data)
         
         if response.status_code != 200:
@@ -222,8 +220,7 @@ async def _update_pr_metadata(repo_owner: str, repo_name: str, pr_id: int,
         "updates": update_data
     }
 
-async def _commit_and_push_changes(repository_path: str, repo_owner: str, repo_name: str, 
-                                  pr_id: int, commit_message: str) -> Dict:
+async def _commit_and_push_changes(repository_path: str, repo_owner: str, repo_name: str, pr_id: int, commit_message: str) -> Dict:
     """Commit changes and push to PR branch"""
     from git import Repo, GitCommandError
     import httpx
@@ -250,7 +247,7 @@ async def _commit_and_push_changes(repository_path: str, repo_owner: str, repo_n
         }
         
         async with httpx.AsyncClient() as client:
-            url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
+            url = f"{settings.GITHUB_API_URL}/repos/{repo_owner}/{repo_name}/pulls/{pr_id}"
             response = await client.get(url, headers=headers)
             
             if response.status_code != 200:
@@ -342,7 +339,7 @@ async def _add_pr_comment(repo_owner: str, repo_name: str, pr_id: int, comment: 
     comment_data = {"body": comment}
     
     async with httpx.AsyncClient() as client:
-        url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues/{pr_id}/comments"
+        url = f"{settings.GITHUB_API_URL}/repos/{repo_owner}/{repo_name}/issues/{pr_id}/comments"
         response = await client.post(url, headers=headers, json=comment_data)
         
         if response.status_code != 201:
