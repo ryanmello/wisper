@@ -31,3 +31,14 @@ export interface VerifyWorkflowResponse {
   success: boolean;
   message: string;
 }
+
+export interface AvailableToolInfo {
+  name: string;
+  description: string;
+  parameters: { [key: string]: any };
+  category: string;
+}
+
+export interface GetToolsResponse {
+  tools: AvailableToolInfo[];
+}

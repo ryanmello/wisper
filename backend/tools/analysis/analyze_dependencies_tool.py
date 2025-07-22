@@ -4,10 +4,12 @@ import re
 import time
 from langchain_core.tools import tool
 from utils.logging_config import get_logger
+from utils.tool_metadata_decorator import tool_category
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 
 logger = get_logger(__name__)
 
+@tool_category("analysis")
 @tool
 def analyze_dependencies(repository_path: str) -> StandardToolResponse:
     """

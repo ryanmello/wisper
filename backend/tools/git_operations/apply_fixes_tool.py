@@ -5,6 +5,7 @@ import json
 from typing import Dict
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.async_tool_decorator import async_tool
+from utils.tool_metadata_decorator import tool_category
 from utils.logging_config import get_logger
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 from config.settings import settings
@@ -12,10 +13,11 @@ from langchain_openai import ChatOpenAI
 
 logger = get_logger(__name__)
 
+@tool_category("git_operations")
 @async_tool
 async def apply_fixes(repository_path: str, prompt: str) -> StandardToolResponse:
-    """Apply file changes to Go repository based on human-readable prompt using AI analysis.
-    
+    """Apply file changes to a repository.
+        
     This tool takes a human-readable description of desired changes and uses AI to analyze 
     the repository context and implement the requested modifications. It handles any type 
     of Go repository changes including dependency updates, code modifications, and vulnerability fixes.

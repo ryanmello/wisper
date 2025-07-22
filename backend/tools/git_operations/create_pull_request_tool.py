@@ -4,15 +4,17 @@ from datetime import datetime
 from langchain_core.tools import tool
 from git import Repo
 from utils.logging_config import get_logger
+from utils.tool_metadata_decorator import tool_category
 from services.github_service import github_service
 from config.settings import settings
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 
 logger = get_logger(__name__)
 
+@tool_category("git_operations")
 @tool
 def create_pull_request(repository_path: str, branch_name: str, title: str, description: str, commit_message: str) -> StandardToolResponse:
-    """Create a pull request for already-modified files in the repository.
+    """Create a GitHub pull request.
     
     This tool creates a new branch, commits existing changes, and opens a pull request on the original repository. 
     It assumes files have already been modified by other tools (typically apply_fixes tool) and focuses on the 

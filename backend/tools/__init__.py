@@ -17,3 +17,10 @@ ALL_TOOLS = [
     update_pull_request,
     generate_summary
 ] 
+
+WAYPOINT_TOOLS = [
+    scan_go_vulnerabilities,
+    create_pull_request,
+    apply_fixes,
+    generate_summary
+] 

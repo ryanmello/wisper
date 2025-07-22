@@ -4,11 +4,13 @@ from git import Repo
 from pathlib import Path
 from config.settings import settings
 from utils.logging_config import get_logger
+from utils.tool_metadata_decorator import tool_category
 from utils.response_builder import create_tool_response_builder
 from models.api_models import StandardToolResponse
 
 logger = get_logger(__name__)
 
+@tool_category("repository")
 @tool
 def clone_repository(repository_url: str, branch: str = None) -> StandardToolResponse:
     """Clone a Git repository to local temporary storage for analysis.
@@ -16,9 +18,6 @@ def clone_repository(repository_url: str, branch: str = None) -> StandardToolRes
     This tool downloads the entire repository codebase to a temporary directory where it can be analyzed by other tools. 
     This is typically the first step in any repository analysis workflow since most other analysis tools require 
     local access to the code files. The tool returns a clone_path that other tools can use to access the repository files.
-    
-    Prerequisites: None - this is a foundational tool
-    Provides: clone_path for use by other analysis tools
     
     Args:
         repository_url: The GitHub repository URL to clone

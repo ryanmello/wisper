@@ -1,12 +1,16 @@
 import subprocess
 from langchain_core.tools import tool
 from utils.logging_config import get_logger
+from utils.tool_metadata_decorator import tool_category
 
 logger = get_logger(__name__)
 
+@tool_category("security")
 @tool
 def scan_go_vulnerabilities(repository_path: str) -> str:
-    """Scan Go repository for security vulnerabilities using govulncheck.
+    """Scan Go repository using govulncheck.
+
+    Scan Go repository for security vulnerabilities using govulncheck.
     
     This tool specifically scans Go projects for known security vulnerabilities using the official govulncheck 
     tool. The tool analyzes Go modules and dependencies for known CVEs and security issues.

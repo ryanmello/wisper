@@ -5,27 +5,25 @@ import time
 import subprocess
 from langchain_core.tools import tool
 from utils.logging_config import get_logger
+from utils.tool_metadata_decorator import tool_category
 from utils.response_builder import create_tool_response_builder
 from models.api_models import StandardToolResponse
 
 logger = get_logger(__name__)
 
+@tool_category("repository")
 @tool
 def cleanup_repository(repository_path: str) -> StandardToolResponse:
-    """Clean up temporary repository files and directories after analysis is complete.
+    """Clean up temporary repository files and directories of cloned repository.
     
-    This tool removes the temporary directory containing the cloned repository to free up disk space. 
-    Use this tool only AFTER all analysis is completely finished, as the repository files will be permanently 
-    deleted and no further analysis will be possible. This is typically the final step in the analysis workflow.
-    
-    Prerequisites: Repository analysis must be complete
-    Warning: This permanently deletes the repository files - use only when done
-    
+    This tool removes the temporary directory containing the cloned repository 
+    and should always be the last tool used if you cloned the repository.
+        
     Args:
         repository_path: Path to the temporary repository directory to clean up
         
     Returns:
-        StandardToolResponse with cleanup status and freed space information
+        StandardToolResponse with cleanup status
     """
     response_builder = create_tool_response_builder("cleanup_repository")
     

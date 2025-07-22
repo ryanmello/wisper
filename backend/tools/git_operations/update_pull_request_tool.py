@@ -2,6 +2,7 @@ import os
 import time
 from typing import Dict, Optional
 from utils.async_tool_decorator import async_tool
+from utils.tool_metadata_decorator import tool_category
 from utils.logging_config import get_logger
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 from services.github_service import github_service
@@ -9,6 +10,7 @@ from config.settings import settings
 
 logger = get_logger(__name__)
 
+@tool_category("git_operations")
 @async_tool
 async def update_pull_request(
     repository_path: str,

@@ -1,19 +1,20 @@
 import inspect
 from typing import List, Dict, Any
 from models.api_models import GetToolsResponse, AvailableToolInfo
-from tools import ALL_TOOLS
+from tools import WAYPOINT_TOOLS
+from utils.tool_metadata_decorator import get_tool_metadata
 
 class ToolService:
     def get_tools(self) -> GetToolsResponse:
         """Get information about all available tools"""
         tools_info = []
         
-        for tool in ALL_TOOLS:
+        for tool in WAYPOINT_TOOLS:
             # Extract tool metadata
             tool_name = tool.name
             tool_description = self._extract_description(tool.description)
             tool_parameters = self._extract_parameters(tool)
-            tool_category = self._extract_category(tool_name)
+            tool_category = self._extract_category(tool)
             
             tool_info = AvailableToolInfo(
                 name=tool_name,
@@ -56,19 +57,10 @@ class ToolService:
         except Exception:
             return {}
     
-    def _extract_category(self, tool_name: str) -> str:
-        """Determine the tool category based on its name"""
-        if any(keyword in tool_name for keyword in ['clone', 'cleanup']):
-            return "repository"
-        elif any(keyword in tool_name for keyword in ['explore', 'analyze', 'dependencies']):
-            return "analysis"
-        elif any(keyword in tool_name for keyword in ['scan', 'vulnerabilities', 'security']):
-            return "security"
-        elif any(keyword in tool_name for keyword in ['create_pull_request', 'apply_fixes']):
-            return "git_operations"
-        elif any(keyword in tool_name for keyword in ['generate', 'summary', 'report']):
-            return "reporting"
-        else:
-            return "general"
+    def _extract_category(self, tool) -> str:
+        """Extract category from tool metadata or fall back to keyword-based detection"""
+        category = get_tool_metadata(tool, 'category')
+        if category:
+            return category
 
 tool_service = ToolService()
