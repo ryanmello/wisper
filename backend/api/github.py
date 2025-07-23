@@ -176,7 +176,7 @@ async def get_pull_requests(request: GetPullRequestsRequest):
                     user=GitHubUser(
                         login=pr["user"]["login"],
                         avatar_url=pr["user"]["avatar_url"],
-                        name=pr["user"]["name"]
+                        name=pr["user"].get("name")
                     ),
                     comments=pr.get("comments", 0),
                     labels=[GitHubLabel(name=label["name"], color=label["color"]) for label in pr.get("labels", [])]
@@ -299,7 +299,7 @@ async def get_pull_request_comments(request: GetPullRequestCommentsRequest):
                     user=GitHubUser(
                         login=comment["user"]["login"],
                         avatar_url=comment["user"]["avatar_url"],
-                        name=comment["user"]["name"]
+                        name=comment["user"].get("name")
                     ),
                     created_at=comment["created_at"],
                     updated_at=comment["updated_at"],
@@ -362,7 +362,7 @@ async def post_pull_request_comment(request: PostPullRequestCommentRequest):
                 user=GitHubUser(
                     login=comment["user"]["login"],
                     avatar_url=comment["user"]["avatar_url"],
-                    name=comment["user"]["name"]
+                    name=comment["user"].get("name")
                 ),
                 created_at=comment["created_at"],
                 updated_at=comment["updated_at"],
