@@ -24,8 +24,8 @@ def async_tool(func=None, **tool_kwargs):
         langchain_tool = tool(**tool_kwargs)(f)
         
         # Mark the tool as async for our orchestrator
-        langchain_tool._is_async_tool = True
-        langchain_tool._original_async_func = f
+        object.__setattr__(langchain_tool, "_is_async_tool", True)
+        object.__setattr__(langchain_tool, "_original_async_func", f)
         
         # Restore any metadata that was on the original function
         for key, value in metadata.items():
