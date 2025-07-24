@@ -26,6 +26,16 @@ class Settings:
     GITHUB_API_URL: str = os.getenv("GITHUB_API_URL", "https://api.github.com")
     GITHUB_DRY_RUN: bool = os.getenv("GITHUB_DRY_RUN", "false").lower() == "true"
     
+    # GitHub OAuth settings
+    GITHUB_CLIENT_ID: Optional[str] = os.getenv("GITHUB_CLIENT_ID")
+    GITHUB_CLIENT_SECRET: Optional[str] = os.getenv("GITHUB_CLIENT_SECRET")
+    
+    # Database settings
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./app.db")
+    
+    # Encryption settings
+    ENCRYPTION_KEY: Optional[str] = os.getenv("ENCRYPTION_KEY")
+    
     @classmethod
     def get_cors_config(cls) -> dict:
         """Get CORS configuration dictionary."""

@@ -22,6 +22,7 @@ export class GitHubAPI {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Include session cookie
         body: JSON.stringify({
           page: 1,
           per_page: 30,
@@ -56,6 +57,7 @@ export class GitHubAPI {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Include session cookie
         body: JSON.stringify({
           page: 1,
           per_page: 30,
@@ -89,6 +91,7 @@ export class GitHubAPI {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Include session cookie
         body: JSON.stringify(request),
       });
 
@@ -117,6 +120,7 @@ export class GitHubAPI {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include", // Include session cookie
         body: JSON.stringify({
           page: 1,
           per_page: 30,
@@ -151,6 +155,7 @@ export class GitHubAPI {
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include", // Include session cookie
           body: JSON.stringify(request),
         }
       );

@@ -47,9 +47,9 @@ export default function Sidebar() {
     };
   }, [showUserTooltip]);
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     setShowUserTooltip(false);
-    logout();
+    await logout();
   };
 
   const handleNavigation = (path: string) => {

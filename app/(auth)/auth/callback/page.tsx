@@ -12,11 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
 import { CheckCircle, AlertCircle, Loader2, Sparkles } from "lucide-react";
+import { getBackendUrl } from "@/lib/config";
 
 function GitHubCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { refreshUser } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
     "loading"
   );
@@ -40,39 +41,41 @@ function GitHubCallbackContent() {
           return;
         }
 
-        // Exchange authorization code for access token via our API route
-        const tokenResponse = await fetch("/api/auth/github", {
+        // Send code to our backend
+        const response = await fetch(`${getBackendUrl()}/auth/github/callback`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
+          credentials: "include", // Include cookies
           body: JSON.stringify({
             code: code,
           }),
         });
 
-        if (!tokenResponse.ok) {
-          const errorData = await tokenResponse.json();
+        if (!response.ok) {
+          const errorData = await response.json();
           throw new Error(
-            errorData.error || "Failed to exchange authorization code for token"
+            errorData.detail || "Failed to authenticate with GitHub"
           );
         }
 
-        const tokenData = await tokenResponse.json();
-
-        // Use auth context to properly set authentication state
-        try {
-          await login(tokenData.access_token);
+        const authData = await response.json();
+        
+        if (authData.success) {
           setStatus("success");
+          
+          // Refresh user data in context
+          await refreshUser();
 
           // Redirect back to main app after a short delay
           setTimeout(() => {
             router.push("/");
           }, 2000);
-        } catch (loginError) {
-          console.error(loginError);
-          throw new Error("Failed to authenticate with GitHub");
+        } else {
+          throw new Error(authData.message || "Authentication failed");
         }
+
       } catch (err) {
         console.error("OAuth callback error:", err);
         setError(
@@ -83,7 +86,7 @@ function GitHubCallbackContent() {
     };
 
     handleCallback();
-  }, [searchParams, router]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams, router]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -127,8 +130,11 @@ function GitHubCallbackContent() {
               <p className="text-gray-700 mb-6 text-sm leading-relaxed bg-gray-50 p-4 rounded-lg">
                 {error}
               </p>
-              <Button className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-2 rounded-lg transition-colors">
-                Return to Conscience
+              <Button 
+                onClick={() => router.push('/sign-in')}
+                className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-2 rounded-lg transition-colors"
+              >
+                Return to Sign In
               </Button>
             </div>
           )}

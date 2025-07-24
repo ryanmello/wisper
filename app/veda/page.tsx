@@ -232,6 +232,7 @@ export default function Veda() {
       user: {
         login: "__SKELETON__",
         avatar_url: "",
+        name: ""
       },
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
