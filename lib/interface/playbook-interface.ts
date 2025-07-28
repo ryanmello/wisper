@@ -1,3 +1,5 @@
+import { WaypointNode, WaypointConnection } from "./waypoint-interface";
+
 export interface CipherPlaybook {
   id: string;
   name: string;
@@ -15,26 +17,8 @@ export interface WaypointPlaybook {
   name: string;
   description?: string;
   repository_url?: string;
-  nodes: Array<{
-    id: string;
-    tool_name: string;
-    position: { x: number; y: number };
-    data: {
-      label: string;
-      icon: string;
-      iconColor: string;
-      category: string;
-    };
-  }>;
-  connections: Array<{
-    id: string;
-    source_id: string;
-    target_id: string;
-    source_tool_name: string;
-    target_tool_name: string;
-    sourceHandle: string;
-    targetHandle: string;
-  }>;
+  nodes: WaypointNode[];
+  connections: WaypointConnection[];
   tags: string[];
   created_at: string;
   updated_at: string;
