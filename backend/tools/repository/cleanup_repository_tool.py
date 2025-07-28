@@ -14,8 +14,10 @@ logger = get_logger(__name__)
 @tool_category("repository")
 @tool
 def cleanup_repository(repository_path: str) -> StandardToolResponse:
-    """Clean up temporary repository files and directories of cloned repository.
+    """Clean up cloned repository.
     
+    Clean up temporary repository files and directories of cloned repository.
+
     This tool removes the temporary directory containing the cloned repository 
     and should always be the last tool used if you cloned the repository.
         

@@ -11,33 +11,16 @@ router = APIRouter()
 
 @router.websocket("/ws/cipher/{task_id}")
 async def cipher_websocket_endpoint(websocket: WebSocket, task_id: str):
+    """WebSocket endpoint for Cipher analysis tasks"""
     try:
         await websocket_service.connect_websocket(task_id, websocket)
+        logger.info(f"Cipher client connected: {task_id}")
         
-        data = await websocket.receive_text()
-        task_params = json.loads(data)
-        
-        repository_url = task_params.get("repository_url")
-        prompt = task_params.get("prompt")
-        
-        if not repository_url:
-            await websocket_service.send_error(task_id, "Repository URL is required")
-            return
-            
-        if not prompt:
-            await websocket_service.send_error(task_id, "Prompt is required")
-            return
-        
-        logger.info(f"Starting task: {task_id}")
-        logger.info(f"Repository: {repository_url}")
-        logger.info(f"User prompt: {prompt[:100]}...")
-        
-        await analysis_service.start_analysis(task_id, repository_url, prompt)
-        
+        # Keep connection alive until task completes or client disconnects
         while True:
             try:
                 message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
-                logger.debug(f"Received message from AI client {task_id}: {message}")
+                logger.debug(f"Received message from Cipher client {task_id}: {message}")
                 
                 try:
                     msg_data = json.loads(message)
@@ -56,22 +39,23 @@ async def cipher_websocket_endpoint(websocket: WebSocket, task_id: str):
                     pass
                 
             except asyncio.TimeoutError:
+                # Check if task is still active
                 if task_id not in task_service.active_tasks:
-                    logger.info(f"Analysis completed for task: {task_id}")
+                    logger.info(f"Cipher analysis completed for task: {task_id}")
                     break
                 if task_id not in websocket_service.active_connections:
                     break
                 continue
             except WebSocketDisconnect:
-                logger.info(f"AI client {task_id} disconnected")
+                logger.info(f"Cipher client {task_id} disconnected")
                 break
     
     except WebSocketDisconnect:
-        logger.info(f"AI client {task_id} disconnected")
+        logger.info(f"Cipher client {task_id} disconnected")
     except Exception as e:
-        logger.error(f"AI WebSocket error for {task_id}: {str(e)}")
+        logger.error(f"Cipher WebSocket error for {task_id}: {str(e)}")
         try:
-            await websocket_service.send_error(task_id, str(e), "ai_websocket")
+            await websocket_service.send_error(task_id, str(e), "cipher_websocket")
         except:
             pass
     finally:
@@ -85,6 +69,7 @@ async def veda_websocket_endpoint(websocket: WebSocket, task_id: str):
         logger.info(f"Veda client connected: {task_id}")
         
         # Keep connection alive until task completes or client disconnects
+        
         while True:
             try:
                 message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
@@ -124,6 +109,58 @@ async def veda_websocket_endpoint(websocket: WebSocket, task_id: str):
         logger.error(f"Veda WebSocket error for {task_id}: {str(e)}")
         try:
             await websocket_service.send_error(task_id, str(e), "veda_websocket")
+        except:
+            pass
+    finally:
+        await websocket_service.disconnect_websocket(task_id)
+
+@router.websocket("/ws/waypoint/{task_id}")
+async def waypoint_websocket_endpoint(websocket: WebSocket, task_id: str):
+    """"""
+    try:
+        await websocket_service.connect_websocket(task_id, websocket)
+        logger.info(f"Waypoint client connected: {task_id}")
+        
+        # Keep connection alive until task completes or client disconnects
+        while True:
+            try:
+                message = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
+                logger.debug(f"Received message from Waypoint client {task_id}: {message}")
+                
+                try:
+                    msg_data = json.loads(message)
+                    msg_type = msg_data.get("type")
+                    
+                    if msg_type == "cancel":
+                        cancelled = task_service.cancel_task(task_id)
+                        if cancelled:
+                            await websocket_service.send_message(task_id, {
+                                "type": "task.cancelled",
+                                "message": "Waypoint cancelled by user"
+                            })
+                        break
+                    
+                except json.JSONDecodeError:
+                    pass
+                
+            except asyncio.TimeoutError:
+                # Check if task is still active
+                if task_id not in task_service.active_tasks:
+                    logger.info(f"Waypoint completed for task: {task_id}")
+                    break
+                if task_id not in websocket_service.active_connections:
+                    break
+                continue
+            except WebSocketDisconnect:
+                logger.info(f"Waypoint client {task_id} disconnected")
+                break
+    
+    except WebSocketDisconnect:
+        logger.info(f"Waypoint client {task_id} disconnected")
+    except Exception as e:
+        logger.error(f"Waypoint WebSocket error for {task_id}: {str(e)}")
+        try:
+            await websocket_service.send_error(task_id, str(e), "waypoint_websocket")
         except:
             pass
     finally:

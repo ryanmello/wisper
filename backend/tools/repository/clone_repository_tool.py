@@ -13,7 +13,9 @@ logger = get_logger(__name__)
 @tool_category("repository")
 @tool
 def clone_repository(repository_url: str, branch: str = None) -> StandardToolResponse:
-    """Clone a Git repository to local temporary storage for analysis.
+    """Clone GitHub repository.
+
+    Clone a Git repository to local temporary storage.
     
     This tool downloads the entire repository codebase to a temporary directory where it can be analyzed by other tools. 
     This is typically the first step in any repository analysis workflow since most other analysis tools require 

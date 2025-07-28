@@ -17,6 +17,9 @@ class WaypointService():
         ).bind_tools(ALL_TOOLS)
     
     def verify_configuration(self, nodes: List[WaypointNode], connections: List[WaypointConnection]) -> VerifyConfigurationResponse:
+        logger.info(nodes)
+        logger.info(connections)
+        
         if self._has_cycle(nodes, connections):
             return VerifyConfigurationResponse (
                 success=False,
@@ -87,8 +90,6 @@ class WaypointService():
         Connections (data flow):
         {chr(10).join(workflow_connections) if workflow_connections else "- No connections (isolated tools)"}
 
-        clone_repository and cleanup_repository will never be included in the workflow because they are ALWAYS the first and last tools executed.
-        
         Please evaluate based on the tool schemas you have access to:
         1. Do the tools flow in a logical order considering their inputs/outputs?
         2. Are there missing prerequisites (e.g., trying to create a pull request before performing analysis or applying fixes)?
@@ -123,5 +124,5 @@ class WaypointService():
                 success=False,
                 message="LLM response parsing failed. Please try again"
             )
-    
+
 waypoint_service = WaypointService()

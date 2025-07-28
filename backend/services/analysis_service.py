@@ -26,87 +26,68 @@ class AnalysisService:
             api_key=settings.OPENAI_API_KEY
         )
     
-    async def start_analysis(self, task_id: str, repository_url: str, prompt: str):
-        analysis_task = asyncio.create_task(self._run_analysis(task_id, repository_url, prompt))
+    async def start_analysis(self, task_id: str, repository_url: str, prompt: str, pr_context: dict = None):
+        """Start an analysis task"""
+        analysis_task = asyncio.create_task(self._run_analysis(task_id, repository_url, prompt, pr_context))
         task_service.active_tasks[task_id] = analysis_task
-        logger.info(f"Created analysis task for {task_id}")
+        logger.info(f"Created task for {task_id}")
+        
+        if pr_context:
+            logger.info(f"PR #{pr_context['pr_metadata']['id']}")
 
-    async def start_veda_analysis(self, task_id: str, repository_url: str, prompt: str, pr_context: dict):
-        """Start a Veda-specific PR analysis task"""
-        analysis_task = asyncio.create_task(self._run_veda_analysis(task_id, repository_url, prompt, pr_context))
-        task_service.active_tasks[task_id] = analysis_task
-        logger.info(f"Created Veda PR analysis task for {task_id} (PR #{pr_context['pr_metadata']['id']})")
-
-    async def _run_analysis(self, task_id: str, repository_url: str, prompt: str):
-        try:
-            await websocket_service.send_progress(
-                task_id, 
-                percentage=0, 
-                current_step="Starting AI Analysis", 
-                step_number=0, 
-                total_steps=10,
-                ai_message="AI is analyzing your repository based on your prompt..."
-            )
-            
-            logger.info(f"Starting analysis for task {task_id}")
-            logger.info(f"Repository: {repository_url}")
-            logger.info(f"Prompt: {prompt}")
-            
-            # on every update from analyze repository
-            # send a websocket message to update the client
-            # end task if the update type is 'analysis_completed' or 'analysis_error' 
-            async for update in self._analyze_repository(task_id, repository_url, prompt):
-                await websocket_service.send_message(task_id, update)
-                
-                if update["type"] in ["analysis_completed", "analysis_error"]:
-                    logger.info(f"AI analysis task {task_id} finished with type: {update['type']}")
-                    break
-
-        except asyncio.CancelledError:
-            logger.info(f"AI analysis task {task_id} was cancelled")
-            raise
-        except Exception as e:
-            logger.error(f"AI analysis task {task_id} failed: {e}")
-            raise
-        finally:
-            if task_id in task_service.active_tasks:
-                del task_service.active_tasks[task_id]
-
-    async def _run_veda_analysis(self, task_id: str, repository_url: str, prompt: str, pr_context: dict):
-        """Run Veda-specific PR analysis with enhanced context"""
-        try:
+    async def _run_analysis(self, task_id: str, repository_url: str, prompt: str, pr_context: dict = None):
+        """Run analysis task - supports both regular and Veda PR analysis"""
+        # Set up context-specific progress messages
+        if pr_context:
             pr_id = pr_context['pr_metadata']['id']
-            await websocket_service.send_progress(
-                task_id, 
-                percentage=0, 
-                current_step=f"Starting Veda analysis for PR #{pr_id}", 
-                step_number=0, 
-                total_steps=10,
-                ai_message=f"Veda is analyzing your request for Pull Request #{pr_id}..."
-            )
+            current_step = f"Starting Veda analysis for PR #{pr_id}"
+            ai_message = f"Veda is analyzing your request for Pull Request #{pr_id}..."
+            analysis_type = "Veda analysis"
             
             logger.info(f"Starting Veda analysis for task {task_id}")
             logger.info(f"Repository: {repository_url}")
             logger.info(f"PR: #{pr_id} - {pr_context['pr_metadata']['title']}")
             logger.info(f"Prompt: {prompt}")
+        else:
+            current_step = "Starting AI Analysis"
+            ai_message = "AI is analyzing your repository based on your prompt..."
+            analysis_type = "AI analysis"
             
-            # Run the analysis with PR-enhanced prompt
-            async for update in self._analyze_repository(task_id, repository_url, prompt):
-                await websocket_service.send_message(task_id, update)
-                
-                if update["type"] in ["analysis_completed", "analysis_error"]:
-                    logger.info(f"Veda analysis task {task_id} finished with type: {update['type']}")
-                    break
+            logger.info(f"Starting analysis for task {task_id}")
+            logger.info(f"Repository: {repository_url}")
+            logger.info(f"Prompt: {prompt}")
+
+        try:
+            await websocket_service.send_progress(
+                task_id, 
+                percentage=0, 
+                current_step=current_step, 
+                step_number=0, 
+                total_steps=10,
+                ai_message=ai_message
+            )
+            
+            await self._process_analysis_updates(task_id, repository_url, prompt, analysis_type)
 
         except asyncio.CancelledError:
-            logger.info(f"Veda analysis task {task_id} was cancelled")
+            logger.info(f"{analysis_type} task {task_id} was cancelled")
             raise
         except Exception as e:
-            logger.error(f"Veda analysis task {task_id} failed: {e}")
+            logger.error(f"{analysis_type} task {task_id} failed: {e}")
             raise
         finally:
             if task_id in task_service.active_tasks:
                 del task_service.active_tasks[task_id]
+
+    async def _process_analysis_updates(self, task_id: str, repository_url: str, prompt: str, analysis_type: str):
+        """Common method to process analysis updates and handle completion/errors"""
+        async for update in self._analyze_repository(task_id, repository_url, prompt):
+            await websocket_service.send_message(task_id, update)
+            
+            if update["type"] in ["analysis_completed", "analysis_error"]:
+                logger.info(f"{analysis_type} task {task_id} finished with type: {update['type']}")
+                # Let the WebSocket endpoint handle disconnect naturally to avoid race conditions
+                break
 
     async def _analyze_repository(self, task_id: str, repository_url: str, prompt: str) -> AsyncGenerator[Dict[str, Any], None]:
         """

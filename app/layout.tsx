@@ -20,9 +20,9 @@ export default function RootLayout({
       <body className={`antialiased`}>
         <AuthProvider>
           <TaskProvider>
-              <Sidebar />
-              <main className="pl-16">{children}</main>
-              <Toaster position="bottom-center" />
+            <Sidebar />
+            <main className="pl-16">{children}</main>
+            <Toaster position="bottom-center" />
           </TaskProvider>
         </AuthProvider>
       </body>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import Canvas from "@/components/waypoint/Canvas";
 import ToolSidebar from "@/components/waypoint/ToolSidebar";
@@ -14,8 +14,13 @@ import {
 import {
   WaypointConnection,
   WaypointNode,
+  WorkflowExecutionState,
+  WebSocketMessage,
+  NodeExecutionStatus,
 } from "@/lib/interface/waypoint-interface";
 import { WaypointAPI } from "@/lib/api/waypoint-api";
+import { GitHubRepository } from "@/lib/interface/github-interface";
+import { GitHubAPI } from "@/lib/api/github-api";
 
 export default function Waypoint() {
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
@@ -39,6 +44,60 @@ export default function Waypoint() {
   const [nodeActionsVisible, setNodeActionsVisible] = useState<string | null>(
     null
   );
+  const [loading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
+
+  // New execution state management
+  const [executionState, setExecutionState] = useState<WorkflowExecutionState>({
+    isRunning: false,
+    nodeStates: {},
+    overallProgress: 0,
+    executionOrder: [],
+  });
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const websocketRef = useRef<WebSocket | null>(null);
+  
+  // Force connection position updates after execution state changes
+  const [connectionUpdateKey, setConnectionUpdateKey] = useState(0);
+
+  useEffect(() => {
+    fetchUserRepositories();
+    
+    // Cleanup WebSocket on unmount
+    return () => {
+      if (websocketRef.current) {
+        websocketRef.current.close();
+      }
+    };
+  }, []);
+
+  // Force connection position recalculation when execution state changes
+  useEffect(() => {
+    // Use requestAnimationFrame to ensure DOM has updated after execution state changes
+    const timeoutId = setTimeout(() => {
+      requestAnimationFrame(() => {
+        setConnectionUpdateKey(prev => prev + 1);
+      });
+    }, 50); // Small delay to ensure node DOM updates are complete
+
+    return () => clearTimeout(timeoutId);
+  }, [executionState.nodeStates]);
+
+  const fetchUserRepositories = async () => {
+    try {
+      setIsLoading(true);
+      const response = await GitHubAPI.getRepositories();
+      setRepositories(response.repositories);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch repositories"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
@@ -49,6 +108,173 @@ export default function Waypoint() {
     setVerificationStatus("idle");
     setVerificationMessage("");
     setIsStartEnabled(false);
+  };
+
+  const resetExecutionState = () => {
+    setExecutionState({
+      isRunning: false,
+      nodeStates: {},
+      overallProgress: 0,
+      executionOrder: [],
+    });
+    setCurrentTaskId(null);
+  };
+
+  // WebSocket connection management - inline handlers to avoid hook order issues
+  const connectWebSocket = (taskId: string, websocketUrl: string) => {
+    if (websocketRef.current) {
+      websocketRef.current.close();
+    }
+
+    const ws = new WebSocket(websocketUrl);
+    websocketRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('WebSocket connected for task:', taskId);
+    };
+
+    ws.onmessage = (event: MessageEvent) => {
+      try {
+        const message: WebSocketMessage = JSON.parse(event.data);
+        
+        console.log('WebSocket message received:', message);
+        
+        setExecutionState(prev => {
+          const newState = { ...prev };
+          
+          switch (message.type) {
+            case 'progress':
+              newState.overallProgress = message.progress?.percentage || prev.overallProgress;
+              break;
+              
+            case 'tool_started':
+              if (message.tool?.name) {
+                // Use current nodes from state instead of closure
+                setNodes(currentNodes => {
+                  const nodeId = currentNodes.find(node => node.tool_name === message.tool!.name)?.id;
+                  if (nodeId) {
+                    console.log('🔵 Tool started executing:', nodeId);
+                    setExecutionState(prevState => ({
+                      ...prevState,
+                      nodeStates: {
+                        ...prevState.nodeStates,
+                        [nodeId]: {
+                          nodeId,
+                          status: 'executing' as NodeExecutionStatus,
+                          startTime: message.timestamp,
+                        }
+                      },
+                      currentTool: message.tool!.name
+                    }));
+                  }
+                  return currentNodes; // Return unchanged nodes
+                });
+              }
+              break;
+              
+            case 'tool_completed':
+              if (message.tool?.name) {
+                const toolResult = message.tool.result;
+                setNodes(currentNodes => {
+                  const nodeId = currentNodes.find(node => node.tool_name === message.tool!.name)?.id;
+                  if (nodeId) {
+                    setExecutionState(prevState => {
+                      const nodeState = prevState.nodeStates[nodeId];
+                      if (nodeState) {
+                        const startTime = nodeState.startTime;
+                        const duration = startTime 
+                          ? new Date(message.timestamp).getTime() - new Date(startTime).getTime()
+                          : undefined;
+                        
+                        const updatedStates = {
+                          ...prevState.nodeStates,
+                          [nodeId]: {
+                            ...nodeState,
+                            status: 'completed' as NodeExecutionStatus,
+                            endTime: message.timestamp,
+                            duration,
+                            result: toolResult,
+                          }
+                        };
+                        
+                        // Mark next tool(s) as queued
+                        const currentIndex = prevState.executionOrder.indexOf(nodeId);
+                        const nextNodeId = prevState.executionOrder[currentIndex + 1];
+                        console.log(`🔄 Tool completed: ${nodeId}, next tool: ${nextNodeId}`);
+                        if (nextNodeId && 
+                            prevState.nodeStates[nextNodeId] && 
+                            prevState.nodeStates[nextNodeId].status === 'pending') {
+                          updatedStates[nextNodeId] = {
+                            ...prevState.nodeStates[nextNodeId],
+                            status: 'queued' as NodeExecutionStatus,
+                          };
+                          console.log('⏳ Next tool queued:', nextNodeId);
+                        }
+                        
+                        return {
+                          ...prevState,
+                          nodeStates: updatedStates
+                        };
+                      }
+                      return prevState;
+                    });
+                  }
+                  return currentNodes; // Return unchanged nodes
+                });
+              }
+              break;
+              
+            case 'tool_error':
+              if (message.tool?.name) {
+                const toolError = message.tool.error;
+                setNodes(currentNodes => {
+                  const nodeId = currentNodes.find(node => node.tool_name === message.tool!.name)?.id;
+                  if (nodeId) {
+                    setExecutionState(prevState => ({
+                      ...prevState,
+                      nodeStates: {
+                        ...prevState.nodeStates,
+                        [nodeId]: {
+                          ...prevState.nodeStates[nodeId],
+                          status: 'failed' as NodeExecutionStatus,
+                          endTime: message.timestamp,
+                          error: message.error?.message || toolError || 'Unknown error',
+                        }
+                      }
+                    }));
+                  }
+                  return currentNodes; // Return unchanged nodes
+                });
+              }
+              break;
+              
+            case 'analysis_completed':
+              newState.isRunning = false;
+              newState.overallProgress = 100;
+              newState.results = message.results;
+              break;
+              
+            case 'analysis_error':
+              newState.isRunning = false;
+              newState.error = message.error?.message || 'Analysis failed';
+              break;
+          }
+          
+          return newState;
+        });
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    ws.onclose = (event) => {
+      console.log('WebSocket disconnected:', event.code, event.reason);
+      websocketRef.current = null;
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
   };
 
   const handleToolDragStart = (tool: any) => {
@@ -243,28 +469,17 @@ export default function Waypoint() {
       return;
     }
 
+    // Reset execution state to clear any previous run visuals
+    resetExecutionState();
+
     setVerificationStatus("verifying");
     setVerificationMessage("");
     setIsStartEnabled(false);
 
-    try {
-      const waypointData = {
-        nodes: nodes.map((node) => ({
-          id: node.id,
-          tool_name: node.tool_name,
-        })),
-        connections: connections.map((conn) => ({
-          id: conn.id,
-          source_id: conn.source_id,
-          source_tool_name: conn.source_tool_name,
-          target_id: conn.target_id,
-          target_tool_name: conn.target_tool_name,
-        })),
-      };
-
+    try {      
       const response = await WaypointAPI.verifyWorkflow({
         nodes: nodes,
-        connections: connections
+        connections: connections,
       });
 
       if (response.success) {
@@ -288,42 +503,119 @@ export default function Waypoint() {
     }
   };
 
+  // Helper function to calculate execution order based on connections
+  const calculateExecutionOrder = (nodes: WaypointNode[], connections: WaypointConnection[]): string[] => {
+    // Build a graph of dependencies
+    const inDegree: Record<string, number> = {};
+    const outgoing: Record<string, string[]> = {};
+    
+    // Initialize all nodes
+    nodes.forEach(node => {
+      inDegree[node.id] = 0;
+      outgoing[node.id] = [];
+    });
+    
+    // Build the dependency graph
+    connections.forEach(conn => {
+      outgoing[conn.source_id].push(conn.target_id);
+      inDegree[conn.target_id]++;
+    });
+    
+    // Topological sort to get execution order
+    const queue: string[] = [];
+    const result: string[] = [];
+    
+    // Find nodes with no dependencies (starting points)
+    Object.keys(inDegree).forEach(nodeId => {
+      if (inDegree[nodeId] === 0) {
+        queue.push(nodeId);
+      }
+    });
+    
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      result.push(current);
+      
+      // Remove this node and update dependencies
+      outgoing[current].forEach(neighbor => {
+        inDegree[neighbor]--;
+        if (inDegree[neighbor] === 0) {
+          queue.push(neighbor);
+        }
+      });
+    }
+    
+    return result;
+  };
+
   const handleStart = async () => {
-    if (!isStartEnabled) return;
+    if (!isStartEnabled || !selectedRepo) return;
 
     try {
-      const workflowData = {
-        nodes: nodes.map((node) => ({
-          id: node.id,
-          tool_name: node.tool_name,
-          label: node.data.label,
-          category: node.data.category,
-        })),
-        connections: connections.map((conn) => ({
-          id: conn.id,
-          source: conn.source_id,
-          target: conn.target_id,
-        })),
-      };
+      // Calculate execution order based on workflow topology
+      const executionOrder = calculateExecutionOrder(nodes, connections);
+      console.log('🔄 Calculated execution order:', executionOrder);
+      
+      // Initialize execution state
+      const initialNodeStates: Record<string, any> = {};
+      nodes.forEach(node => {
+        initialNodeStates[node.id] = {
+          nodeId: node.id,
+          status: 'pending',
+        };
+      });
 
-      console.log(workflowData);
+      // Mark the first tool(s) in execution order as queued (ready to start)
+      executionOrder.slice(0, 1).forEach(nodeId => {
+        if (initialNodeStates[nodeId]) {
+          initialNodeStates[nodeId].status = 'queued';
+          console.log('⏳ Marked as queued:', nodeId);
+        }
+      });
 
-      // Simulate some delay for realistic feel
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      setExecutionState({
+        isRunning: true,
+        nodeStates: initialNodeStates,
+        overallProgress: 0,
+        executionOrder: executionOrder,
+      });
 
-      const mockResult = {
-        success: true,
-        executionId: `exec_${Date.now()}`,
-        message: "Workflow execution started successfully",
-      };
+      const response = await WaypointAPI.startWorkflow({
+        repository_url: selectedRepo.full_name || "",
+        nodes: nodes,
+        connections: connections,
+      });
 
-      console.log(mockResult);
+      setCurrentTaskId(response.task_id);
+      
+      // Connect to WebSocket for real-time updates
+      connectWebSocket(response.task_id, response.websocket_url);
 
       // Reset verification status after starting
       resetVerificationStatus();
     } catch (error) {
       console.error("Failed to start workflow:", error);
+      resetExecutionState();
     }
+  };
+
+  const handleStop = () => {
+    if (websocketRef.current) {
+      websocketRef.current.close();
+    }
+    resetExecutionState();
+  };
+
+  const handleSavePlaybook = () => {
+    if (nodes.length === 0) return;
+
+    // TODO: Implement save playbook logic
+    console.log("Saving waypoint playbook with nodes:", nodes);
+    console.log("Connections:", connections);
+    console.log("Selected repository:", selectedRepo?.full_name);
+    
+    // For now, just show a simple alert
+    alert("Waypoint playbook save functionality will be implemented soon!");
   };
 
   return (
@@ -339,6 +631,12 @@ export default function Waypoint() {
               nodes={nodes}
               connections={connections}
               selectedNodeId={selectedNodeId}
+              repositories={repositories}
+              selectedRepo={selectedRepo}
+              repoError={error}
+              executionState={executionState}
+              connectionUpdateKey={connectionUpdateKey}
+              onRepoSelect={setSelectedRepo}
               onNodeSelect={handleNodeSelect}
               onNodeMove={handleNodeMove}
               onCanvasClick={handleCanvasClick}
@@ -356,11 +654,15 @@ export default function Waypoint() {
             <StatusBar
               nodes={nodes}
               connections={connections}
+              executionState={executionState}
               onVerifyConfiguration={handleVerifyConfiguration}
               onStart={handleStart}
+              onStop={handleStop}
+              onSavePlaybook={handleSavePlaybook}
               verificationStatus={verificationStatus}
               verificationMessage={verificationMessage}
               isStartEnabled={isStartEnabled}
+              hasSelectedRepo={selectedRepo !== null}
             />
           </div>
         </ResizablePanel>

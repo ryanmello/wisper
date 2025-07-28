@@ -61,6 +61,7 @@ async def get_user_repositories(request: GetRepositoriesRequest):
             raise HTTPException(status_code=500, detail="GitHub token not configured")
         
         token = settings.GITHUB_TOKEN
+        logger.info(token)
         
         # GitHub API endpoint for user repositories
         url = f"{settings.GITHUB_API_URL}/user/repos"

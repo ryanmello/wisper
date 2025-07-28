@@ -41,7 +41,7 @@ async def analyze_comment(request: VedaRequest):
         enhanced_prompt = _create_pr_analysis_prompt(request.user_comment, pr_context)
         
         # Start Veda analysis task
-        await analysis_service.start_veda_analysis(
+        await analysis_service.start_analysis(
             task_id=task_id,
             repository_url=repository_url,
             prompt=enhanced_prompt,

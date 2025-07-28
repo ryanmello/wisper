@@ -51,6 +51,23 @@ export function getStatusColor(status: Task['status']): string {
   return colors[status] || colors.created;
 }
 
+export const getLanguageColor = (language: string | null) => {
+  if (!language) return "bg-gray-500";
+  const colors: Record<string, string> = {
+    TypeScript: "bg-blue-500",
+    JavaScript: "bg-purple-500",
+    Python: "bg-yellow-500",
+    Java: "bg-orange-500",
+    Go: "bg-cyan-500",
+    Rust: "bg-red-500",
+    "C++": "bg-green-500",
+    "C#": "bg-purple-600",
+    PHP: "bg-indigo-500",
+    Ruby: "bg-red-600",
+  };
+  return colors[language] || "bg-gray-500";
+};
+
 export function generateTaskTitle(prompt: string): string {
   const title = prompt.trim().substring(0, 50);
   return title.length < prompt.trim().length ? `${title}...` : title;

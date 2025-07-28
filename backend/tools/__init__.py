@@ -19,6 +19,8 @@ ALL_TOOLS = [
 ] 
 
 WAYPOINT_TOOLS = [
+    clone_repository,
+    cleanup_repository,
     scan_go_vulnerabilities,
     create_pull_request,
     apply_fixes,

@@ -437,7 +437,6 @@ export function TaskProvider({ children }: TaskProviderProps) {
         const ws = CipherAPI.connectWebSocket(
           task.websocket_url,
           task.id,
-          { repository_url: task.repository_url, prompt: task.prompt },
           (message) => handleWebSocketMessage(task.id, message),
           (error) => {
             console.error("WebSocket error for task", task.id, error);
@@ -494,7 +493,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
       dispatch({ type: "set_error", payload: null });
 
       try {
-        const response = await CipherAPI.createTask(request);
+        const response = await CipherAPI.startAnalysis(request);
         const task = createTaskFromResponse(response, request);
 
         dispatch({ type: "add_task", payload: task });

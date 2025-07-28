@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { WaypointAPI } from "@/lib/api/waypoint-api";
 import { AvailableToolInfo } from "@/lib/interface/waypoint-interface";
 import {

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, getLanguageColor } from "@/lib/utils";
 import { Github, ChevronDown } from "lucide-react";
 import { GitHubRepository } from "@/lib/interface/github-interface";
 
@@ -15,7 +15,6 @@ interface RepoDropdownProps {
   setSelectedRepo: (repo: GitHubRepository) => void;
   setShowDropdown: (show: boolean) => void;
   setShowDropdownContent: (show: boolean) => void;
-  getLanguageColor: (language: string | null) => string;
 }
 
 export default function RepoDropdown({
@@ -29,7 +28,6 @@ export default function RepoDropdown({
   setSelectedRepo,
   setShowDropdown,
   setShowDropdownContent,
-  getLanguageColor,
 }: RepoDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 

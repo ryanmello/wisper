@@ -230,6 +230,17 @@ class VerifyConfigurationResponse(BaseModel):
     success: bool = Field(..., description="Represents a valid configuration")
     message: str = Field(..., description="Human-readable message about the validation result")
 
+class StartWorkflowRequest(BaseModel):
+    repository_url: str = Field(..., description="")
+    nodes: List[WaypointNode] = Field(..., description="")
+    connections: List[WaypointConnection] = Field(..., description="")
+
+class StartWorkflowResponse(BaseModel):
+    task_id: str = Field(..., description="Unique task identifier")
+    status: str = Field(default="created", description="Task status")
+    websocket_url: str = Field(..., description="WebSocket URL for real-time AI orchestration updates")
+    message: str = Field(..., description="Status message")
+
 class AvailableToolInfo(BaseModel):
     """Information about an available tool"""
     name: str = Field(..., description="Tool name/identifier")

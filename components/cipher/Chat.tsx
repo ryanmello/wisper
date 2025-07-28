@@ -5,8 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
-import { AlertCircle, ArrowUpRight } from "lucide-react";
+import { AlertCircle, ArrowUpRight, BookMarked, Layers } from "lucide-react";
 import RepoDropdown from "./RepoDropdown";
+import { SavePlaybookDialog } from "@/components/playbook/SavePlaybookDialog";
+import { toast } from "sonner";
 import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
 
@@ -15,21 +17,24 @@ interface ChatProps {
 }
 
 export function Chat({ isAuthenticated }: ChatProps) {
-  const { 
-    createTask, 
-    isLoading: isTaskLoading, 
+  const {
+    createTask,
+    isLoading: isTaskLoading,
     error: taskError,
-    clearError
+    clearError,
   } = useTask();
-  
+
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
-  const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(
+    null
+  );
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showDropdownContent, setShowDropdownContent] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
-  
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -60,12 +65,14 @@ export function Chat({ isAuthenticated }: ChatProps) {
         setRepoError(null);
         const response = await GitHubAPI.getRepositories({
           sort: "updated",
-          per_page: 50
+          per_page: 50,
         });
         setRepositories(response.repositories);
       } catch (error) {
         console.error("Failed to fetch repositories:", error);
-        setRepoError("Unable to connect to GitHub. Please check your connection.");
+        setRepoError(
+          "Unable to connect to GitHub. Please check your connection."
+        );
       }
     };
 
@@ -119,7 +126,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
     try {
       const task = await createTask({
         repository_url: `https://github.com/${selectedRepo.full_name}`,
-        prompt: message.trim()
+        prompt: message.trim(),
       });
 
       if (task) {
@@ -130,21 +137,14 @@ export function Chat({ isAuthenticated }: ChatProps) {
     }
   };
 
-  const getLanguageColor = (language: string | null) => {
-    if (!language) return "bg-gray-500";
-    const colors: Record<string, string> = {
-      TypeScript: "bg-blue-500",
-      JavaScript: "bg-purple-500",
-      Python: "bg-yellow-500",
-      Java: "bg-orange-500",
-      Go: "bg-cyan-500",
-      Rust: "bg-red-500",
-      "C++": "bg-green-500",
-      "C#": "bg-purple-600",
-      PHP: "bg-indigo-500",
-      Ruby: "bg-red-600",
-    };
-    return colors[language] || "bg-gray-500";
+  const handleSavePlaybook = () => {
+    if (!message.trim() || isTaskLoading) return;
+    setShowSaveDialog(true);
+  };
+
+  const handleSaveSuccess = (playbookId: string) => {
+    console.log("Playbook saved with ID:", playbookId);
+    // Toast is now handled in the dialog component
   };
 
   const hasContent = message.trim().length >= 20;
@@ -200,7 +200,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
               data-gramm_editor="false"
               data-enable-grammarly="false"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();
                   handleSend();
                 }
@@ -223,31 +223,49 @@ export function Chat({ isAuthenticated }: ChatProps) {
                 setSelectedRepo={setSelectedRepo}
                 setShowDropdown={setShowDropdown}
                 setShowDropdownContent={setShowDropdownContent}
-                getLanguageColor={getLanguageColor}
               />
 
-              {/* Send Button */}
-              <Button
-                onClick={handleSend}
-                disabled={!hasContent || isTaskLoading || !selectedRepo}
-                size="icon"
-                className={cn(
-                  "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
-                  "shadow-md hover:shadow-lg border-0",
-                  hasContent && !isTaskLoading && selectedRepo
-                    ? "bg-primary hover:bg-primary/90 text-primary-foreground scale-100 opacity-100 hover:scale-105"
-                    : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95",
-                  isTaskLoading && "animate-pulse scale-100"
-                )}
-              >
-                {isTaskLoading ? (
-                  <div className="relative">
-                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  </div>
-                ) : (
-                  <ArrowUpRight className="w-4 h-4" />
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                {/* Save Playbook Button */}
+                <Button
+                  onClick={handleSavePlaybook}
+                  disabled={!hasContent || isTaskLoading || !selectedRepo}
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
+                    "shadow-md hover:shadow-lg border border-border/40",
+                    hasContent && !isTaskLoading && selectedRepo
+                      ? "border-primary/20 hover:border-primary/40 hover:bg-primary/5 scale-100 opacity-100 hover:scale-105"
+                      : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95"
+                  )}
+                >
+                  <Layers className="w-4 h-4" />
+                </Button>
+
+                {/* Send Button */}
+                <Button
+                  onClick={handleSend}
+                  disabled={!hasContent || isTaskLoading || !selectedRepo}
+                  size="icon"
+                  className={cn(
+                    "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
+                    "shadow-md hover:shadow-lg border-0",
+                    hasContent && !isTaskLoading && selectedRepo
+                      ? "bg-primary hover:bg-primary/90 text-primary-foreground scale-100 opacity-100 hover:scale-105"
+                      : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95",
+                    isTaskLoading && "animate-pulse scale-100"
+                  )}
+                >
+                  {isTaskLoading ? (
+                    <div className="relative">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    </div>
+                  ) : (
+                    <ArrowUpRight className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -280,6 +298,14 @@ export function Chat({ isAuthenticated }: ChatProps) {
           </span>
         </div>
       </div>
+
+      <SavePlaybookDialog
+        open={showSaveDialog}
+        onOpenChange={setShowSaveDialog}
+        prompt={message.trim()}
+        repository={selectedRepo?.full_name}
+        onSuccess={handleSaveSuccess}
+      />
     </div>
   );
 }

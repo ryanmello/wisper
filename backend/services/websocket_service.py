@@ -18,18 +18,30 @@ class WebsocketService:
     
     # disconnect and cancel running tasks
     async def disconnect_websocket(self, task_id: str):
-        if task_id in self.active_connections:
-            del self.active_connections[task_id]
+        # Make this method idempotent to handle multiple calls
+        websocket = self.active_connections.get(task_id)
+        if websocket:
+            try:
+                await websocket.close()
+                logger.debug(f"WebSocket closed for task {task_id}")
+            except Exception as e:
+                logger.warning(f"Error closing WebSocket for task {task_id}: {e}")
+            
+            # Remove from active connections after closing
+            self.active_connections.pop(task_id, None)
         
-        cancelled = task_service.cancel_task(task_id)
-        if cancelled:
-            logger.info(f"Cancelled analysis task {task_id} during disconnect")
+        # Only try to cancel if task is still active
+        if task_id in task_service.active_tasks:
+            cancelled = task_service.cancel_task(task_id)
+            if cancelled:
+                logger.info(f"Cancelled analysis task {task_id} during disconnect")
         
         logger.info(f"WebSocket disconnected for task {task_id}")
 
     # send message to a specific websocket connection
     async def send_message(self, task_id: str, message: Dict[str, Any]):
-        if task_id in self.active_connections:
+        websocket = self.active_connections.get(task_id)
+        if websocket:
             try:
                 # Always ensure timestamp is present and valid
                 from datetime import datetime
@@ -39,10 +51,12 @@ class WebsocketService:
                 if "task_id" not in message:
                     message["task_id"] = task_id
                 
-                await self.active_connections[task_id].send_text(json.dumps(message))
+                await websocket.send_text(json.dumps(message))
             except Exception as e:
                 logger.error(f"Failed to send message to {task_id}: {e}")
-                await self.disconnect_websocket(task_id)
+                # If we can't send, the connection is likely closed - remove it
+                self.active_connections.pop(task_id, None)
+                logger.debug(f"Removed disconnected WebSocket for task {task_id}")
     
     # Helper method for sending error messages
     async def send_error(self, task_id: str, error: str, context: str = None):
