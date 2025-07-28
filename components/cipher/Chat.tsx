@@ -5,12 +5,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
-import { AlertCircle, ArrowUpRight, BookMarked, Layers } from "lucide-react";
+import { AlertCircle, ArrowUpRight, Layers } from "lucide-react";
 import RepoDropdown from "./RepoDropdown";
-import { SavePlaybookDialog } from "@/components/playbook/SavePlaybookDialog";
 import { toast } from "sonner";
 import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
+import { Dialog, DialogTrigger } from "../ui/dialog";
+import SavePlaybookDialogContent from "../playbook/SavePlaybookDialogContent";
 
 interface ChatProps {
   isAuthenticated: boolean;
@@ -33,7 +34,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showDropdownContent, setShowDropdownContent] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -137,13 +138,9 @@ export function Chat({ isAuthenticated }: ChatProps) {
     }
   };
 
-  const handleSavePlaybook = () => {
-    if (!message.trim() || isTaskLoading) return;
-    setShowSaveDialog(true);
-  };
-
   const handleSaveSuccess = (playbookId: string) => {
     console.log("Playbook saved with ID:", playbookId);
+    setSaveDialogOpen(false);
     // Toast is now handled in the dialog component
   };
 
@@ -227,21 +224,29 @@ export function Chat({ isAuthenticated }: ChatProps) {
 
               <div className="flex items-center gap-2">
                 {/* Save Playbook Button */}
-                <Button
-                  onClick={handleSavePlaybook}
-                  disabled={!hasContent || isTaskLoading || !selectedRepo}
-                  variant="outline"
-                  size="icon"
-                  className={cn(
-                    "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
-                    "shadow-md hover:shadow-lg border border-border/40",
-                    hasContent && !isTaskLoading && selectedRepo
-                      ? "border-primary/20 hover:border-primary/40 hover:bg-primary/5 scale-100 opacity-100 hover:scale-105"
-                      : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95"
-                  )}
-                >
-                  <Layers className="w-4 h-4" />
-                </Button>
+                <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      disabled={!hasContent || isTaskLoading || !selectedRepo}
+                      variant="outline"
+                      size="icon"
+                      className={cn(
+                        "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
+                        "shadow-md hover:shadow-lg border border-border/40",
+                        hasContent && !isTaskLoading && selectedRepo
+                          ? "border-primary/20 hover:border-primary/40 hover:bg-primary/5 scale-100 opacity-100 hover:scale-105"
+                          : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95"
+                      )}
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <SavePlaybookDialogContent 
+                    prompt={message.trim()}
+                    repository={selectedRepo?.full_name}
+                    onSuccess={handleSaveSuccess}
+                  />
+                </Dialog>
 
                 {/* Send Button */}
                 <Button
@@ -298,14 +303,6 @@ export function Chat({ isAuthenticated }: ChatProps) {
           </span>
         </div>
       </div>
-
-      <SavePlaybookDialog
-        open={showSaveDialog}
-        onOpenChange={setShowSaveDialog}
-        prompt={message.trim()}
-        repository={selectedRepo?.full_name}
-        onSuccess={handleSaveSuccess}
-      />
     </div>
   );
 }

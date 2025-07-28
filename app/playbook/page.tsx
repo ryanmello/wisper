@@ -66,23 +66,14 @@ export default function Playbook() {
   };
 
   const handleDeletePlaybook = async (playbook: Playbook) => {
-    try {
-      const result = await PlaybookAPI.deletePlaybook(playbook.id);
-      if (result.success) {
-        toast.success("Playbook deleted successfully");
-        // Refresh the playbooks list
-        await loadPlaybooks();
-      } else {
-        toast.error("Failed to delete playbook", {
-          description: result.message,
-        });
-      }
-    } catch (error) {
-      console.error("Error deleting playbook:", error);
-      toast.error("Failed to delete playbook", {
-        description: "An unexpected error occurred.",
-      });
-    }
+    // This is called after successful deletion from the dialog
+    // Just refresh the list, don't call the API again
+    await loadPlaybooks();
+  };
+
+  const handleEditPlaybook = async (playbook: Playbook) => {
+    // Refresh the playbooks list after editing
+    await loadPlaybooks();
   };
 
   const scrollCipher = (direction: "left" | "right") => {
@@ -123,7 +114,7 @@ export default function Playbook() {
         {/* Header */}
         <div className="flex items-center justify-center mb-8 gap-2">
           <Layers size={32} />
-          <h1 className="text-3xl font-semibold">Playbook</h1>
+          <h1 className="text-2xl font-semibold">Playbook</h1>
         </div>
 
         {/* Cipher Playbooks Section */}
@@ -174,6 +165,7 @@ export default function Playbook() {
                       onRun={handleRunPlaybook}
                       onCopy={handleCopyPlaybook}
                       onShare={handleSharePlaybook}
+                      onEdit={handleEditPlaybook}
                       onDelete={handleDeletePlaybook}
                     />
                   </div>
@@ -236,6 +228,7 @@ export default function Playbook() {
                       onRun={handleRunPlaybook}
                       onCopy={handleCopyPlaybook}
                       onShare={handleSharePlaybook}
+                      onEdit={handleEditPlaybook}
                       onDelete={handleDeletePlaybook}
                     />
                   </div>

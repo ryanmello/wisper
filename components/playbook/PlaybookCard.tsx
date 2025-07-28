@@ -26,8 +26,13 @@ import {
   Share,
   MoreHorizontal,
   AlertTriangle,
+  Pencil,
+  Trash,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
+import DeletePlaybookDialogContent from "./DeletePlaybookDialogContent";
+import EditPlaybookDialogContent from "./EditPlaybookDialogContent";
 
 interface PlaybookCardProps {
   playbook: Playbook;
@@ -87,47 +92,38 @@ export function PlaybookCard({
               {playbook.type}
             </Badge>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[400px] bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl rounded-xl p-0">
-              <div className="flex flex-col items-center p-6">
-                <AlertTriangle className="h-8 w-8 text-red-500 mb-4" />
-                <DialogHeader className="w-full">
-                  <DialogTitle className="text-lg font-semibold">
-                    Are you sure?
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="w-full mb-4">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    Do you want to delete{" "}
-                    <span className="font-semibold text-red-500 underline underline-offset-2">
-                      {playbook.name}
-                    </span>
-                    ?
-                  </p>
-                </div>
-                <div className="w-full flex flex-col sm:flex-row gap-2 mt-2">
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="flex-1">
-                      Cancel
-                    </Button>
-                  </DialogTrigger>
-                  <DialogTrigger asChild>
-                    <Button
-                      className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold shadow-sm"
-                      onClick={() => onDelete?.(playbook)}
-                    >
-                      Delete
-                    </Button>
-                  </DialogTrigger>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center">
+            {/* Edit Dialog */}
+            {playbook.type === "cipher" && playbook.cipher_config && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" title="Edit">
+                    <Pencil className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <EditPlaybookDialogContent
+                    playbook={playbook}
+                    onSuccess={() => onEdit?.(playbook)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
+            {/* Delete Dialog */}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Trash className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[400px]">
+                <DeletePlaybookDialogContent
+                  playbook={playbook}
+                  onDelete={onDelete}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         <CardTitle className="text-lg">{playbook.name}</CardTitle>
         {playbook.description && (
@@ -175,24 +171,11 @@ export function PlaybookCard({
           <Button
             size="sm"
             onClick={() => onRun?.(playbook)}
-            className="flex-1"
+            className="flex-1 bg-gray-50"
+            variant="outline"
           >
             <Play className="h-3 w-3 mr-1" />
             Run
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onCopy?.(playbook)}
-          >
-            <Copy className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onShare?.(playbook)}
-          >
-            <Share className="h-3 w-3" />
           </Button>
         </div>
       </CardContent>
