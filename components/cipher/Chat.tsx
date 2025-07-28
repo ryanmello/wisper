@@ -1,17 +1,16 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
 import { AlertCircle, ArrowUpRight, Layers } from "lucide-react";
 import RepoDropdown from "./RepoDropdown";
-import { toast } from "sonner";
 import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
-import { Dialog, DialogTrigger } from "../ui/dialog";
-import SavePlaybookDialogContent from "../playbook/SavePlaybookDialogContent";
+import { Dialog } from "../ui/dialog";
+import PlaybookDialog from "../playbook/PlaybookDialog";
 
 interface ChatProps {
   isAuthenticated: boolean;
@@ -224,24 +223,26 @@ export function Chat({ isAuthenticated }: ChatProps) {
 
               <div className="flex items-center gap-2">
                 {/* Save Playbook Button */}
+                <Button
+                  disabled={!hasContent || isTaskLoading || !selectedRepo}
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setSaveDialogOpen(true)}
+                  className={cn(
+                    "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
+                    "shadow-md hover:shadow-lg border border-border/40",
+                    hasContent && !isTaskLoading && selectedRepo
+                      ? "border-primary/20 hover:border-primary/40 hover:bg-primary/5 scale-100 opacity-100 hover:scale-105"
+                      : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95"
+                  )}
+                >
+                  <Layers className="w-4 h-4" />
+                </Button>
+                
+                {/* Save Playbook Dialog */}
                 <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      disabled={!hasContent || isTaskLoading || !selectedRepo}
-                      variant="outline"
-                      size="icon"
-                      className={cn(
-                        "h-10 w-10 rounded-xl transition-all duration-300 ease-out",
-                        "shadow-md hover:shadow-lg border border-border/40",
-                        hasContent && !isTaskLoading && selectedRepo
-                          ? "border-primary/20 hover:border-primary/40 hover:bg-primary/5 scale-100 opacity-100 hover:scale-105"
-                          : "bg-muted/70 text-muted-foreground/60 scale-95 opacity-50 cursor-not-allowed hover:bg-muted/70 hover:scale-95"
-                      )}
-                    >
-                      <Layers className="w-4 h-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <SavePlaybookDialogContent 
+                  <PlaybookDialog
+                    mode="save-cipher"
                     prompt={message.trim()}
                     repository={selectedRepo?.full_name}
                     onSuccess={handleSaveSuccess}

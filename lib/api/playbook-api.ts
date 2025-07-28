@@ -112,6 +112,7 @@ export class PlaybookAPI {
     nodes: any[];
     connections: any[];
     tags?: string[];
+    repository_url?: string;
   }): Promise<{ success: boolean; playbook_id: string; message: string }> {
     try {
       const playbooks = this.getPlaybooks();
@@ -124,6 +125,7 @@ export class PlaybookAPI {
         description: data.description,
         nodes: data.nodes,
         connections: data.connections,
+        repository_url: data.repository_url,
         tags: data.tags || [],
         created_at: now,
         updated_at: now,
@@ -213,7 +215,7 @@ export class PlaybookAPI {
     }
   }
 
-  static async updatePlaybook(playbook_id: string, updates: Partial<Playbook>): Promise<{ success: boolean; message: string }> {
+  static async updatePlaybook(playbook_id: string, updates: Partial<Playbook>): Promise<{ success: boolean; message: string; playbook_id: string }> {
     try {
       const playbooks = this.getPlaybooks();
       const index = playbooks.findIndex(p => p.id === playbook_id);
@@ -222,6 +224,7 @@ export class PlaybookAPI {
         return {
           success: false,
           message: 'Playbook not found',
+          playbook_id: '',
         };
       }
 
@@ -236,12 +239,14 @@ export class PlaybookAPI {
       return {
         success: true,
         message: 'Playbook updated successfully',
+        playbook_id: playbook_id,
       };
     } catch (error) {
       console.error('Error updating playbook:', error);
       return {
         success: false,
         message: 'Failed to update playbook',
+        playbook_id: '',
       };
     }
   }

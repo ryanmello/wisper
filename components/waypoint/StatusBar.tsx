@@ -103,11 +103,7 @@ const StatusBar = ({
           {onSavePlaybook && (
             <Button
               onClick={onSavePlaybook}
-              disabled={
-                nodes.length === 0 ||
-                executionState.isRunning ||
-                isFinalizingState
-              }
+              disabled={!isStartEnabled}
               variant="outline"
               size="sm"
               className="relative overflow-hidden bg-gradient-to-r from-purple-50 to-purple-50 hover:from-purple-100 hover:to-purple-100 border-purple-200 text-purple-700 hover:text-purple-800 transition-all duration-200 disabled:from-gray-50 disabled:to-gray-50 disabled:text-gray-400 disabled:border-gray-200 shadow-sm hover:shadow-md"

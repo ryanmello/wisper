@@ -440,7 +440,6 @@ export default function Veda() {
                 setSelectedRepo={handleRepoSelection}
                 setShowDropdown={setShowRepoDropdown}
                 setShowDropdownContent={setShowRepoDropdownContent}
-                getLanguageColor={getLanguageColor}
               />
 
               <PullRequestsDropdown

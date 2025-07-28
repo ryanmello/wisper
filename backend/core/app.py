@@ -35,7 +35,8 @@ async def startup_event():
     if not settings.OPENAI_API_KEY:
         raise ValueError("OPENAI_API_KEY is required but not set in environment variables")
     if not settings.GITHUB_TOKEN:
-        raise ValueError("GITHUB_TOKEN is required but not set in environment variables")
+        logger.warning("GITHUB_TOKEN not set: GitHub features will be unavailable")
+
     
 async def shutdown_event():
     for task_id in list(websocket_service.active_connections.keys()):

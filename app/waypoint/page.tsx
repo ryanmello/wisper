@@ -21,8 +21,12 @@ import {
 import { WaypointAPI } from "@/lib/api/waypoint-api";
 import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
+import { Dialog } from "@/components/ui/dialog";
+import PlaybookDialog from "@/components/playbook/PlaybookDialog";
 
 export default function Waypoint() {
+  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
   const [connections, setConnections] = useState<WaypointConnection[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -49,7 +53,6 @@ export default function Waypoint() {
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
 
-  // New execution state management
   const [executionState, setExecutionState] = useState<WorkflowExecutionState>({
     isRunning: false,
     nodeStates: {},
@@ -61,6 +64,7 @@ export default function Waypoint() {
   
   // Force connection position updates after execution state changes
   const [connectionUpdateKey, setConnectionUpdateKey] = useState(0);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchUserRepositories();
@@ -98,8 +102,6 @@ export default function Waypoint() {
       setIsLoading(false);
     }
   };
-
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
   if (isAuthLoading) return <AuthLoadingScreen />;
   if (!isAuthenticated) return null;
@@ -608,14 +610,13 @@ export default function Waypoint() {
 
   const handleSavePlaybook = () => {
     if (nodes.length === 0) return;
+    setSaveDialogOpen(true);
+  };
 
-    // TODO: Implement save playbook logic
-    console.log("Saving waypoint playbook with nodes:", nodes);
-    console.log("Connections:", connections);
-    console.log("Selected repository:", selectedRepo?.full_name);
-    
-    // For now, just show a simple alert
-    alert("Waypoint playbook save functionality will be implemented soon!");
+  const handleSaveSuccess = (playbookId: string) => {
+    console.log("Waypoint playbook saved with ID:", playbookId);
+    setSaveDialogOpen(false);
+    // Toast is handled in the dialog component
   };
 
   return (
@@ -664,6 +665,17 @@ export default function Waypoint() {
               isStartEnabled={isStartEnabled}
               hasSelectedRepo={selectedRepo !== null}
             />
+            
+            {/* Save Waypoint Playbook Dialog */}
+            <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+              <PlaybookDialog
+                mode="save-waypoint"
+                nodes={nodes}
+                connections={connections}
+                repository={selectedRepo?.full_name}
+                onSuccess={handleSaveSuccess}
+              />
+            </Dialog>
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

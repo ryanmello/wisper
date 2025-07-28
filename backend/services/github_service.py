@@ -10,9 +10,32 @@ logger = get_logger(__name__)
 
 class GitHubService:    
     def __init__(self):
-        self.github_client = Github(settings.GITHUB_TOKEN)
-        user = self.github_client.get_user()
-        logger.info(f"GitHub authenticated as: {user.login}")
+        self.github_client: Optional[Github] = None
+        self._authenticated = False
+        self._auth_attempted = False
+        
+    @property
+    def client(self) -> Optional[Github]:
+        """Lazy initialization of GitHub client with authentication."""
+        if not self._authenticated and not self._auth_attempted:
+            self._auth_attempted = True
+            if settings.GITHUB_TOKEN:
+                try:
+                    self.github_client = Github(settings.GITHUB_TOKEN)
+                    # Test authentication by getting user info
+                    self.github_client.get_user()
+                    self._authenticated = True
+                    logger.info(f"GitHub authenticated as: {self.github_client.get_user().login}")
+                except Exception as e:
+                    logger.warning(f"GitHub authentication failed: {e}")
+                    logger.info("GitHub features will be unavailable - continuing without authentication")
+            else:
+                logger.warning("GitHub token not provided - GitHub features will be unavailable")
+        return self.github_client if self._authenticated else None
+    
+    def is_available(self) -> bool:
+        """Check if GitHub features are available."""
+        return self.client is not None
     
     def create_pull_request(
         self, 
@@ -41,6 +64,13 @@ class GitHubService:
             Dictionary with PR creation results including PR URL and metadata
         """
         try:
+            if not self.is_available():
+                return {
+                    "status": "error",
+                    "action": "failed",
+                    "error": "GitHub authentication required but not available. Please configure a valid GITHUB_TOKEN."
+                }
+                
             if settings.GITHUB_DRY_RUN:
                 logger.info("Running in GitHub dry run mode")
                 return {
@@ -72,7 +102,7 @@ class GitHubService:
                     "error": "Invalid GitHub repository URL format"
                 }
             
-            github_repo = self.github_client.get_repo(repo_path)
+            github_repo = self.client.get_repo(repo_path)
             base_branch = github_repo.default_branch
             logger.info(f"Using base branch: {base_branch}")
             

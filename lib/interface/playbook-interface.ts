@@ -14,6 +14,7 @@ export interface WaypointPlaybook {
   id: string;
   name: string;
   description?: string;
+  repository_url?: string;
   nodes: Array<{
     id: string;
     tool_name: string;

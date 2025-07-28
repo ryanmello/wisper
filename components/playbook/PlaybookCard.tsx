@@ -30,9 +30,7 @@ import {
   Trash,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-import { useState } from "react";
-import DeletePlaybookDialogContent from "./DeletePlaybookDialogContent";
-import EditPlaybookDialogContent from "./EditPlaybookDialogContent";
+import PlaybookDialog from "./PlaybookDialog";
 
 interface PlaybookCardProps {
   playbook: Playbook;
@@ -93,22 +91,25 @@ export function PlaybookCard({
             </Badge>
           </div>
           <div className="flex items-center">
-            {/* Edit Dialog */}
-            {playbook.type === "cipher" && playbook.cipher_config && (
+            {/* Edit Button */}
+            {((playbook.type === "cipher" && playbook.cipher_config) ||
+              (playbook.type === "waypoint" && playbook.waypoint_config)) && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="ghost" size="sm" title="Edit">
                     <Pencil className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <EditPlaybookDialogContent
-                    playbook={playbook}
-                    onSuccess={() => onEdit?.(playbook)}
-                  />
-                </DialogContent>
+                <PlaybookDialog
+                  mode={
+                    playbook.type === "cipher" ? "edit-cipher" : "edit-waypoint"
+                  }
+                  playbook={playbook}
+                  onSuccess={() => onEdit?.(playbook)}
+                />
               </Dialog>
             )}
+
             {/* Delete Dialog */}
             <Dialog>
               <DialogTrigger asChild>
@@ -116,12 +117,11 @@ export function PlaybookCard({
                   <Trash className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[400px]">
-                <DeletePlaybookDialogContent
-                  playbook={playbook}
-                  onDelete={onDelete}
-                />
-              </DialogContent>
+              <PlaybookDialog
+                mode="delete"
+                playbook={playbook}
+                onDelete={onDelete}
+              />
             </Dialog>
           </div>
         </div>
@@ -146,6 +146,60 @@ export function PlaybookCard({
               <Badge variant="outline" className="text-xs">
                 +{playbook.tags.length - 3} more
               </Badge>
+            )}
+          </div>
+        )}
+
+        {/* Cipher Repository Display */}
+        {playbook.type === "cipher" && playbook.cipher_config?.repository && (
+          <div className="mb-3 p-2 bg-gray-50 rounded-md">
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Repository:</span>{" "}
+              {playbook.cipher_config.repository}
+            </div>
+            {playbook.cipher_config.prompt && (
+              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                <span className="font-medium">Prompt:</span>{" "}
+                {playbook.cipher_config.prompt}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Waypoint Workflow Summary */}
+        {playbook.type === "waypoint" && playbook.waypoint_config && (
+          <div className="mb-3 p-2 bg-gray-50 rounded-md">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Workflow:</span>
+              <span className="font-medium">
+                {playbook.waypoint_config.nodes.length} nodes,{" "}
+                {playbook.waypoint_config.connections.length} connections
+              </span>
+            </div>
+            {playbook.waypoint_config.repository_url && (
+              <div className="text-xs text-muted-foreground">
+                <span className="font-medium">Repository:</span>{" "}
+                {playbook.waypoint_config.repository_url}
+              </div>
+            )}
+          </div>
+        )}
+
+        {playbook.type === "waypoint" && playbook.waypoint_config && (
+          <div className="mb-3">
+            {playbook.waypoint_config.nodes.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {playbook.waypoint_config.nodes.slice(0, 3).map((node) => (
+                  <Badge key={node.id} variant="outline" className="text-xs">
+                    {node.data.label}
+                  </Badge>
+                ))}
+                {playbook.waypoint_config.nodes.length > 3 && (
+                  <Badge variant="outline" className="text-xs">
+                    +{playbook.waypoint_config.nodes.length - 3} more tools
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
         )}

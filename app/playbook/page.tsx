@@ -52,7 +52,19 @@ export default function Playbook() {
 
   const handleRunPlaybook = (playbook: Playbook) => {
     console.log("Running playbook:", playbook.name);
-    // TODO: Implement run logic
+    
+    if (playbook.type === "cipher") {
+      // TODO: Navigate to cipher with pre-filled prompt
+      console.log("Would navigate to cipher with:", playbook.cipher_config);
+    } else if (playbook.type === "waypoint") {
+      // TODO: Send waypoint workflow to backend
+      console.log("Would send waypoint workflow to backend:", {
+        repository_url: playbook.waypoint_config?.repository_url,
+        nodes: playbook.waypoint_config?.nodes,
+        connections: playbook.waypoint_config?.connections,
+      });
+      toast.success(`Waypoint playbook "${playbook.name}" would run with ${playbook.waypoint_config?.nodes.length} nodes`);
+    }
   };
 
   const handleCopyPlaybook = (playbook: Playbook) => {
