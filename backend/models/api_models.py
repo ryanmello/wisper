@@ -47,6 +47,7 @@ class GitHubRepository(BaseModel):
     id: int = Field(..., description="Repository ID")
     name: str = Field(..., description="Repository name")
     full_name: str = Field(..., description="Full repository name (owner/repo)")
+    url: str = Field(..., description="Repository url")
     description: Optional[str] = Field(None, description="Repository description")
     language: Optional[str] = Field(None, description="Primary language")
     stargazers_count: int = Field(..., description="Number of stars")

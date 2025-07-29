@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import { useAuth } from "@/context/auth-context";
+import { useTask } from "@/context/task-context";
 import { PlaybookCard } from "@/components/playbook/PlaybookCard";
 import { Button } from "@/components/ui/button";
 import type { Playbook } from "@/lib/interface/playbook-interface";
@@ -22,12 +24,16 @@ import { toast } from "sonner";
 
 export default function Playbook() {
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const { createTask } = useTask();
+  const router = useRouter();
   const cipherScrollRef = useRef<HTMLDivElement>(null);
   const waypointScrollRef = useRef<HTMLDivElement>(null);
 
   const [cipherPlaybooks, setCipherPlaybooks] = useState<Playbook[]>([]);
   const [waypointPlaybooks, setWaypointPlaybooks] = useState<Playbook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const [startedTasks, setStartedTasks] = useState<Record<string, string>>({});
 
   const loadPlaybooks = async () => {
     try {
@@ -50,20 +56,84 @@ export default function Playbook() {
   if (isAuthLoading) return <AuthLoadingScreen />;
   if (!isAuthenticated) return null;
 
-  const handleRunPlaybook = (playbook: Playbook) => {
-    console.log("Running playbook:", playbook.name);
-    
+  const handleRunPlaybook = async (playbook: Playbook) => {
     if (playbook.type === "cipher") {
-      // TODO: Navigate to cipher with pre-filled prompt
-      console.log("Would navigate to cipher with:", playbook.cipher_config);
+      // Validate required fields
+      if (!playbook.cipher_config?.prompt || !playbook.cipher_config?.repository) {
+        toast.error("Invalid cipher playbook", {
+          description: "Missing prompt or repository information."
+        });
+        return;
+      }
+
+      try {
+        // Set loading state for this specific playbook
+        setLoadingStates(prev => ({ ...prev, [playbook.id]: true }));
+
+        // Create task using task context (this adds it to the context automatically)
+        const task = await createTask({
+          repository_url: playbook.cipher_config.repository,
+          prompt: playbook.cipher_config.prompt
+        });
+
+        if (!task) {
+          throw new Error("Failed to create task");
+        }
+
+        // Store the started task
+        setStartedTasks(prev => ({ ...prev, [playbook.id]: task.id }));
+
+        // Show success feedback
+        toast.success("Analysis Started!", {
+          description: `"${playbook.name}" playbook is now running. Click "View Task" to monitor progress.`
+        });
+
+      } catch (error) {
+        console.error("Error starting cipher analysis:", error);
+        toast.error("Failed to start analysis", {
+          description: error instanceof Error ? error.message : "An unexpected error occurred."
+        });
+      } finally {
+        // Clear loading state
+        setLoadingStates(prev => ({ ...prev, [playbook.id]: false }));
+      }
     } else if (playbook.type === "waypoint") {
-      // TODO: Send waypoint workflow to backend
-      console.log("Would send waypoint workflow to backend:", {
-        repository_url: playbook.waypoint_config?.repository_url,
-        nodes: playbook.waypoint_config?.nodes,
-        connections: playbook.waypoint_config?.connections,
-      });
-      toast.success(`Waypoint playbook "${playbook.name}" would run with ${playbook.waypoint_config?.nodes.length} nodes`);
+      // Validate required fields
+      if (!playbook.waypoint_config?.nodes || playbook.waypoint_config.nodes.length === 0) {
+        toast.error("Invalid waypoint playbook", {
+          description: "No workflow nodes found."
+        });
+        return;
+      }
+
+      try {
+        // Set loading state for this specific playbook
+        setLoadingStates(prev => ({ ...prev, [playbook.id]: true }));
+
+        // Navigate to waypoint page with playbook data
+        router.push(`/waypoint?playbook=${playbook.id}`);
+        
+        // Show success feedback
+        toast.success("Workflow Loaded!", {
+          description: `"${playbook.name}" workflow opened in Waypoint. Verify and run the configuration.`
+        });
+
+      } catch (error) {
+        console.error("Error loading waypoint workflow:", error);
+        toast.error("Failed to load workflow", {
+          description: error instanceof Error ? error.message : "An unexpected error occurred."
+        });
+      } finally {
+        // Clear loading state
+        setLoadingStates(prev => ({ ...prev, [playbook.id]: false }));
+      }
+    }
+  };
+
+  const handleViewTask = (playbook: Playbook) => {
+    const taskId = startedTasks[playbook.id];
+    if (taskId) {
+      router.push(`/cipher/${taskId}`);
     }
   };
 
@@ -174,7 +244,10 @@ export default function Playbook() {
                   <div key={playbook.id} className="flex-none w-80">
                     <PlaybookCard
                       playbook={playbook}
+                      isLoading={loadingStates[playbook.id] || false}
+                      hasStartedTask={!!startedTasks[playbook.id]}
                       onRun={handleRunPlaybook}
+                      onViewTask={handleViewTask}
                       onCopy={handleCopyPlaybook}
                       onShare={handleSharePlaybook}
                       onEdit={handleEditPlaybook}
@@ -237,7 +310,10 @@ export default function Playbook() {
                   <div key={playbook.id} className="flex-none w-80">
                     <PlaybookCard
                       playbook={playbook}
+                      isLoading={loadingStates[playbook.id] || false}
+                      hasStartedTask={!!startedTasks[playbook.id]}
                       onRun={handleRunPlaybook}
+                      onViewTask={handleViewTask}
                       onCopy={handleCopyPlaybook}
                       onShare={handleSharePlaybook}
                       onEdit={handleEditPlaybook}

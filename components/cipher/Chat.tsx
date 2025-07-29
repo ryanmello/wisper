@@ -125,7 +125,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
 
     try {
       const task = await createTask({
-        repository_url: `https://github.com/${selectedRepo.full_name}`,
+        repository_url: selectedRepo.url,
         prompt: message.trim(),
       });
 
@@ -244,7 +244,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
                   <PlaybookDialog
                     mode="save-cipher"
                     prompt={message.trim()}
-                    repository={selectedRepo?.full_name}
+                    repository={selectedRepo?.url}
                     onSuccess={handleSaveSuccess}
                   />
                 </Dialog>

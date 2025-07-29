@@ -28,13 +28,18 @@ import {
   AlertTriangle,
   Pencil,
   Trash,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import PlaybookDialog from "./PlaybookDialog";
 
 interface PlaybookCardProps {
   playbook: Playbook;
+  isLoading?: boolean;
+  hasStartedTask?: boolean;
   onRun?: (playbook: Playbook) => void;
+  onViewTask?: (playbook: Playbook) => void;
   onCopy?: (playbook: Playbook) => void;
   onShare?: (playbook: Playbook) => void;
   onEdit?: (playbook: Playbook) => void;
@@ -43,7 +48,10 @@ interface PlaybookCardProps {
 
 export function PlaybookCard({
   playbook,
+  isLoading = false,
+  hasStartedTask = false,
   onRun,
+  onViewTask,
   onCopy,
   onShare,
   onEdit,
@@ -222,15 +230,32 @@ export function PlaybookCard({
 
         {/* Actions */}
         <div className="flex gap-2">
-          <Button
-            size="sm"
-            onClick={() => onRun?.(playbook)}
-            className="flex-1 bg-gray-50"
-            variant="outline"
-          >
-            <Play className="h-3 w-3 mr-1" />
-            Run
-          </Button>
+          {hasStartedTask ? (
+            <Button
+              size="sm"
+              onClick={() => onViewTask?.(playbook)}
+              className="flex-1 bg-blue-50 hover:bg-blue-100 border-blue-200"
+              variant="outline"
+            >
+              <ExternalLink className="h-3 w-3 mr-1 text-blue-600" />
+              <span className="text-blue-700">View Task</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => onRun?.(playbook)}
+              className="flex-1 bg-gray-50"
+              variant="outline"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Play className="h-3 w-3 mr-1" />
+              )}
+              {isLoading ? "Starting..." : "Run"}
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

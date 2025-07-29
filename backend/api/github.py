@@ -98,6 +98,7 @@ async def get_user_repositories(request: GetRepositoriesRequest):
                     id=repo["id"],
                     name=repo["name"],
                     full_name=repo["full_name"],
+                    url=repo["html_url"],
                     description=repo.get("description"),
                     language=repo.get("language"),
                     stargazers_count=repo["stargazers_count"],

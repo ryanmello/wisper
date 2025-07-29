@@ -15,10 +15,6 @@ def scan_go_vulnerabilities(repository_path: str) -> str:
     This tool specifically scans Go projects for known security vulnerabilities using the official govulncheck 
     tool. The tool analyzes Go modules and dependencies for known CVEs and security issues.
     
-    Prerequisites: Repository must contain Go code.
-    Go and govulncheck must be installed.
-    Best used: After confirming the repository uses Go language
-    
     Args:
         repository_path: Path to the cloned repository containing Go code
         

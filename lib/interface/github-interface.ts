@@ -6,6 +6,7 @@ export interface GitHubRepository {
   id: number;
   name: string;
   full_name: string;
+  url: string;
   description?: string;
   language?: string;
   stargazers_count: number;

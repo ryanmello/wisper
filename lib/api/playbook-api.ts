@@ -163,6 +163,16 @@ export class PlaybookAPI {
     }
   }
 
+  static getPlaybookById(id: string): Playbook | null {
+    try {
+      const playbooks = this.getPlaybooks();
+      return playbooks.find(p => p.id === id) || null;
+    } catch (error) {
+      console.error('Error getting playbook by ID:', error);
+      return null;
+    }
+  }
+
   static getAllPlaybooks(): {
     cipher_playbooks: Playbook[];
     waypoint_playbooks: Playbook[];

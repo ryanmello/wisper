@@ -84,6 +84,25 @@ export function getToolIcon(tool: AvailableToolInfo): {
   return { icon: Terminal, color: "text-gray-500" };
 }
 
+// Helper function to get icon by tool name only (for playbook restoration)
+export function getToolIconByName(toolName: string, category?: string): {
+  icon: LucideIcon;
+  color: string;
+} {
+  // First check for tool-specific mapping
+  if (TOOL_SPECIFIC_ICONS[toolName]) {
+    return TOOL_SPECIFIC_ICONS[toolName];
+  }
+
+  // Fall back to category mapping if provided
+  if (category && CATEGORY_ICONS[category]) {
+    return CATEGORY_ICONS[category];
+  }
+
+  // Default fallback
+  return { icon: Terminal, color: "text-gray-500" };
+}
+
 export function formatToolLabel(toolName: string): string {
   // Convert snake_case to Title Case
   return toolName

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import Canvas from "@/components/waypoint/Canvas";
 import ToolSidebar from "@/components/waypoint/ToolSidebar";
@@ -23,9 +24,15 @@ import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
 import { Dialog } from "@/components/ui/dialog";
 import PlaybookDialog from "@/components/playbook/PlaybookDialog";
+import { PlaybookAPI } from "@/lib/api/playbook-api";
+import { Button } from "@/components/ui/button";
+import { Layers, X } from "lucide-react";
+import { toast } from "sonner";
+import { getToolIconByName, formatToolLabel, formatCategory } from "@/components/waypoint/ToolSidebar";
 
 export default function Waypoint() {
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
 
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
   const [connections, setConnections] = useState<WaypointConnection[]>([]);
@@ -53,6 +60,11 @@ export default function Waypoint() {
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
 
+  // Playbook loading state
+  const [isPlaybookLoaded, setIsPlaybookLoaded] = useState(false);
+  const [loadedPlaybookId, setLoadedPlaybookId] = useState<string | null>(null);
+  const [loadedPlaybookName, setLoadedPlaybookName] = useState<string>('');
+
   const [executionState, setExecutionState] = useState<WorkflowExecutionState>({
     isRunning: false,
     nodeStates: {},
@@ -76,6 +88,114 @@ export default function Waypoint() {
       }
     };
   }, []);
+
+  // Load playbook workflow from URL parameters
+  useEffect(() => {
+    const playbookId = searchParams.get('playbook');
+    if (playbookId && repositories.length > 0 && loadedPlaybookId !== playbookId) {
+      loadPlaybookWorkflow(playbookId);
+    }
+  }, [searchParams, repositories, loadedPlaybookId]);
+
+  const findRepositoryByUrl = (url: string): GitHubRepository | null => {
+    return repositories.find(repo => repo.url === url) || null;
+  };
+
+  // Transform playbook nodes to restore proper icon components
+  const transformPlaybookNodes = (nodes: WaypointNode[]): WaypointNode[] => {
+    return nodes.map(node => {
+      // Get the proper icon component based on tool name
+      const { icon, color } = getToolIconByName(node.tool_name, node.data.category);
+      
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          icon: icon, // Restore the React component
+          iconColor: color, // Update color if needed
+          label: formatToolLabel(node.tool_name), // Ensure consistent formatting
+          category: formatCategory(node.data.category) // Ensure consistent formatting
+        }
+      };
+    });
+  };
+
+  const loadPlaybookWorkflow = (playbookId: string) => {
+    try {
+      const playbook = PlaybookAPI.getPlaybookById(playbookId);
+      
+      if (!playbook) {
+        toast.error("Playbook not found", {
+          description: "The requested playbook could not be found."
+        });
+        return;
+      }
+
+      if (playbook.type !== 'waypoint' || !playbook.waypoint_config) {
+        toast.error("Invalid playbook", {
+          description: "This is not a valid waypoint playbook."
+        });
+        return;
+      }
+
+      const waypointConfig = playbook.waypoint_config;
+
+      // Load workflow data with icon transformation
+      const transformedNodes = transformPlaybookNodes(waypointConfig.nodes);
+      setNodes(transformedNodes);
+      setConnections(waypointConfig.connections);
+
+      // Auto-select repository if available
+      if (waypointConfig.repository_url) {
+        const repo = findRepositoryByUrl(waypointConfig.repository_url);
+        if (repo) {
+          setSelectedRepo(repo);
+        } else {
+          toast.warning("Repository not found", {
+            description: "The repository from this playbook is not in your available repositories. Please select manually."
+          });
+        }
+      }
+
+      // Set loaded state
+      setIsPlaybookLoaded(true);
+      setLoadedPlaybookId(playbookId);
+      setLoadedPlaybookName(playbook.name);
+
+      // Reset verification status since workflow has changed
+      resetVerificationStatus();
+
+      toast.success("Playbook loaded!", {
+        description: `"${playbook.name}" workflow has been loaded. Verify the configuration and click Start.`
+      });
+
+    } catch (error) {
+      console.error("Error loading playbook workflow:", error);
+      toast.error("Failed to load playbook", {
+        description: "An error occurred while loading the playbook workflow."
+      });
+    }
+  };
+
+  const clearLoadedPlaybook = () => {
+    setNodes([]);
+    setConnections([]);
+    setSelectedRepo(null);
+    setIsPlaybookLoaded(false);
+    setLoadedPlaybookId(null);
+    setLoadedPlaybookName('');
+    resetVerificationStatus();
+    resetExecutionState();
+    
+    // Remove playbook parameter from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('playbook');
+    window.history.replaceState({}, '', url.toString());
+
+    toast.success("Workflow cleared", {
+      description: "The loaded playbook workflow has been cleared."
+    });
+  };
 
   // Force connection position recalculation when execution state changes
   useEffect(() => {
@@ -583,7 +703,7 @@ export default function Waypoint() {
       });
 
       const response = await WaypointAPI.startWorkflow({
-        repository_url: selectedRepo.full_name || "",
+        repository_url: selectedRepo.url || "",
         nodes: nodes,
         connections: connections,
       });
@@ -627,7 +747,7 @@ export default function Waypoint() {
         </ResizablePanel>
         <ResizableHandle />
         <ResizablePanel defaultSize={80}>
-          <div className="flex-1 flex flex-col h-full">
+          <div className="flex-1 flex flex-col h-full">            
             <Canvas
               nodes={nodes}
               connections={connections}
@@ -672,7 +792,7 @@ export default function Waypoint() {
                 mode="save-waypoint"
                 nodes={nodes}
                 connections={connections}
-                repository={selectedRepo?.full_name}
+                repository={selectedRepo?.url}
                 onSuccess={handleSaveSuccess}
               />
             </Dialog>
