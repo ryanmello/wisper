@@ -83,6 +83,7 @@ export default function SignInPage() {
     const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(
       REDIRECT_URI
     )}&scope=${encodeURIComponent(SCOPES)}`;
+    console.log(githubAuthUrl)
 
     window.location.href = githubAuthUrl;
   };

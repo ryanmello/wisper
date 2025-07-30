@@ -1,14 +1,14 @@
 import {
-  AIAnalysisRequest,
-  AIAnalysisResponse,
+  CipherRequest,
+  CipherResponse,
   StandardWebSocketMessage,
 } from "../interface/cipher-interface";
 import { API_BASE_URL } from "../utils";
 
 export class CipherAPI {
   static async startAnalysis(
-    request: AIAnalysisRequest
-  ): Promise<AIAnalysisResponse> {
+    request: CipherRequest
+  ): Promise<CipherResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/cipher`, {
         method: "POST",

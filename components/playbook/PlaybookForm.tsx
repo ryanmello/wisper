@@ -26,25 +26,28 @@ import {
 } from "@/lib/interface/waypoint-interface";
 import type { Playbook } from "@/lib/interface/playbook-interface";
 
-const createFormSchema = (mode: string, type: string) => {
-  const baseSchema = {
-    name: z.string().min(1, "Name is required").max(100),
-    description: z.string().min(1, "Description is required").max(500),
-    tags: z.array(z.string()).min(1, "At least one tag is required").max(10),
-  };
+// Base form schema for common fields
+const baseFormSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  description: z.string().min(1, "Description is required").max(500),
+  tags: z.array(z.string()).min(1, "At least one tag is required").max(10),
+});
 
-  if (type === "cipher") {
-    return z.object({
-      ...baseSchema,
-      prompt: z
-        .string()
-        .min(10, "Prompt must be at least 10 characters")
-        .max(1000),
-    });
-  }
+// Cipher-specific form schema
+const cipherFormSchema = baseFormSchema.extend({
+  prompt: z
+    .string()
+    .min(10, "Prompt must be at least 10 characters")
+    .max(1000),
+});
 
-  return z.object(baseSchema);
-};
+// Waypoint form schema (just the base)
+const waypointFormSchema = baseFormSchema;
+
+// Type definitions
+type BaseFormData = z.infer<typeof baseFormSchema>;
+type CipherFormData = z.infer<typeof cipherFormSchema>;
+type WaypointFormData = z.infer<typeof waypointFormSchema>;
 
 type PlaybookDialogMode =
   | "save-cipher"
@@ -63,6 +66,15 @@ interface PlaybookFormProps {
   playbook?: Playbook;
   // Callbacks
   onSuccess?: (playbookId: string) => void;
+}
+
+// Type guard functions
+function isCipherFormData(data: BaseFormData | CipherFormData, mode: PlaybookDialogMode): data is CipherFormData {
+  return mode.includes("cipher");
+}
+
+function isWaypointFormData(data: BaseFormData | CipherFormData, mode: PlaybookDialogMode): data is WaypointFormData {
+  return mode.includes("waypoint");
 }
 
 export default function PlaybookForm({
@@ -88,22 +100,27 @@ export default function PlaybookForm({
     playbook?.cipher_config?.repository ||
     playbook?.waypoint_config?.repository_url;
 
-  // Create schema based on type
-  const formSchema = createFormSchema(
-    mode,
-    isCipherType ? "cipher" : "waypoint"
-  );
-  type FormData = z.infer<typeof formSchema>;
+  // Get the appropriate schema based on type
+  const formSchema = isCipherType ? cipherFormSchema : waypointFormSchema;
+  type FormData = typeof formSchema extends typeof cipherFormSchema ? CipherFormData : WaypointFormData;
 
   // Get initial values based on mode
-  const getInitialValues = () => {
+  const getInitialValues = (): FormData => {
     if (isSaveMode) {
-      return {
+      const baseValues = {
         name: "",
         description: "",
         tags: [],
-        ...(isCipherType && { prompt: prompt }),
       };
+      
+      if (isCipherType) {
+        return {
+          ...baseValues,
+          prompt: prompt,
+        } as FormData;
+      } else {
+        return baseValues as FormData;
+      }
     } else if (isEditMode && playbook) {
       if (isCipherType && playbook.cipher_config) {
         return {
@@ -111,16 +128,21 @@ export default function PlaybookForm({
           description: playbook.cipher_config.description || "",
           prompt: playbook.cipher_config.prompt,
           tags: playbook.cipher_config.tags || [],
-        };
+        } as FormData;
       } else if (isWaypointType && playbook.waypoint_config) {
         return {
           name: playbook.waypoint_config.name,
           description: playbook.waypoint_config.description || "",
           tags: playbook.waypoint_config.tags || [],
-        };
+        } as FormData;
       }
     }
-    return { name: "", description: "", tags: [], prompt: "" };
+    
+    const fallbackValues = { name: "", description: "", tags: [] };
+    if (isCipherType) {
+      return { ...fallbackValues, prompt: "" } as FormData;
+    }
+    return fallbackValues as FormData;
   };
 
   const form = useForm<FormData>({
@@ -157,15 +179,15 @@ export default function PlaybookForm({
       let result;
 
       if (isSaveMode) {
-        if (isCipherType) {
+        if (isCipherType && isCipherFormData(values, mode)) {
           result = await PlaybookAPI.saveCipherPlaybook({
             name: values.name.trim(),
             description: values.description.trim(),
-            prompt: (values as any).prompt.trim(),
+            prompt: values.prompt.trim(),
             repository,
             tags: values.tags,
           });
-        } else {
+        } else if (isWaypointType && isWaypointFormData(values, mode)) {
           result = await PlaybookAPI.saveWaypointPlaybook({
             name: values.name.trim(),
             description: values.description.trim(),
@@ -176,12 +198,12 @@ export default function PlaybookForm({
           });
         }
       } else if (isEditMode && playbook) {
-        if (isCipherType && playbook.cipher_config) {
+        if (isCipherType && playbook.cipher_config && isCipherFormData(values, mode)) {
           const updatedCipherConfig = {
             ...playbook.cipher_config,
             name: values.name.trim(),
             description: values.description.trim(),
-            prompt: (values as any).prompt.trim(),
+            prompt: values.prompt.trim(),
             tags: values.tags,
             updated_at: new Date().toISOString(),
           };
@@ -192,7 +214,7 @@ export default function PlaybookForm({
             tags: values.tags,
             cipher_config: updatedCipherConfig,
           });
-        } else if (isWaypointType && playbook.waypoint_config) {
+        } else if (isWaypointType && playbook.waypoint_config && isWaypointFormData(values, mode)) {
           const updatedWaypointConfig = {
             ...playbook.waypoint_config,
             name: values.name.trim(),
@@ -289,7 +311,7 @@ export default function PlaybookForm({
         {isCipherType && (
           <FormField
             control={form.control}
-            name={"prompt" as any}
+            name={"prompt" as keyof FormData}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Prompt *</FormLabel>
@@ -464,3 +486,4 @@ export default function PlaybookForm({
     </Form>
   );
 }
+

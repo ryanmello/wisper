@@ -26,7 +26,7 @@ import LoadingToolsSkeleton from "./LoadingToolsSkeleton";
 interface ToolType {
   id: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   iconColor: string;
   category: string;
   description: string;

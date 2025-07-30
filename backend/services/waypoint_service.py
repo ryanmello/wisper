@@ -13,7 +13,8 @@ class WaypointService():
         self.llm = ChatOpenAI(
             model="gpt-4", 
             temperature=0.1, 
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL
         ).bind_tools(ALL_TOOLS)
     
     def verify_configuration(self, nodes: List[WaypointNode], connections: List[WaypointConnection]) -> VerifyConfigurationResponse:

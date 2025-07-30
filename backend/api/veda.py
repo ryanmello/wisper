@@ -35,7 +35,7 @@ async def analyze_comment(request: VedaRequest):
             raise HTTPException(status_code=500, detail=f"Failed to fetch pull request data: {str(e)}")
         
         # Create repository URL for the orchestrator
-        repository_url = f"https://github.com/{request.repo_owner}/{request.repo_name}"
+        repository_url = f"{settings.GITHUB_URL}/{request.repo_owner}/{request.repo_name}"
         
         # Create enhanced prompt with PR context
         enhanced_prompt = _create_pr_analysis_prompt(request.user_comment, pr_context)

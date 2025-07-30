@@ -31,12 +31,12 @@ export interface ToolResult {
   completed_at?: string;
 }
 
-export interface AIAnalysisRequest {
+export interface CipherRequest {
   repository_url: string;
   prompt: string;
 }
 
-export interface AIAnalysisResponse {
+export interface CipherResponse {
   task_id: string;
   status: string;
   websocket_url: string;
@@ -56,11 +56,48 @@ export interface StandardMetrics {
   execution_time_ms?: number;
 }
 
+// Tool-specific result data (varies by tool but follows common patterns)
+export interface ToolResponseData {
+  action?: string;
+  files_modified?: number;
+  files_failed?: number;
+  files_analyzed?: number;
+  issues_found?: number;
+  vulnerabilities_found?: number;
+  dependencies?: Record<string, string[]>;
+  languages?: Record<string, number>;
+  frameworks?: string[];
+  architecture_patterns?: string[];
+  summary?: string;
+  // Allow tool-specific fields
+  [key: string]: string | number | boolean | string[] | Record<string, any> | undefined;
+}
+
+// Analysis execution information from backend
+export interface AnalysisExecutionInfo {
+  user_prompt: string;
+  total_tools_executed: number;
+  tools_used: string[];
+  timestamp: string;
+  task_id?: string;
+  repository_url?: string;
+}
+
+// Analysis metrics from completed tasks
+export interface AnalysisMetrics {
+  total_files_processed: number;
+  total_issues_found: number;
+  execution_time_seconds: number;
+  tools_executed: number;
+  vulnerabilities_found?: number;
+  dependencies_analyzed?: number;
+}
+
 export interface StandardToolResponse {
   status: "success" | "error" | "partial_success" | "skipped";
   tool_name: string;
   timestamp: string;
-  data?: any;
+  data?: ToolResponseData;
   error?: StandardError;
   summary?: string;
   metrics?: StandardMetrics;
@@ -83,9 +120,9 @@ export interface ToolInfo {
 
 export interface AnalysisResults {
   summary: string;
-  execution_info: Record<string, any>;
+  execution_info: AnalysisExecutionInfo;
   tool_results: Record<string, StandardToolResponse>;
-  metrics: Record<string, any>;
+  metrics: AnalysisMetrics;
   recommendations: string[];
 }
 

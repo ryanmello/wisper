@@ -45,15 +45,56 @@ export interface StartWorkflowResponse {
   message: string;
 }
 
+// Tool parameter value types
+export type ToolParameterValue = string | number | boolean | string[] | Record<string, string>;
+
+export interface ToolParameter {
+  type: string;
+  description?: string;
+  required?: boolean;
+  default?: ToolParameterValue;
+}
+
 export interface AvailableToolInfo {
   name: string;
   description: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, ToolParameter>;
   category: string;
 }
 
 export interface GetToolsResponse {
   tools: AvailableToolInfo[];
+}
+
+// Standard metrics structure from backend
+export interface StandardMetrics {
+  items_processed?: number;
+  files_analyzed?: number;
+  issues_found?: number;
+  execution_time_ms?: number;
+}
+
+// Tool-specific result data (varies by tool but common patterns)
+export interface ToolResultData {
+  action?: string;
+  files_modified?: number;
+  files_failed?: number;
+  files_analyzed?: number;
+  issues_found?: number;
+  vulnerabilities_found?: number;
+  summary?: string;
+  // Tool-specific fields can extend this
+  [key: string]: string | number | boolean | string[] | undefined;
+}
+
+// Execution information structure from backend analysis service
+export interface ExecutionInfo {
+  user_prompt?: string;
+  total_tools_executed: number;
+  tools_used: string[];
+  timestamp: string;
+  workflow_id?: string;
+  repository_url?: string;
 }
 
 // New interfaces for workflow execution tracking
@@ -65,7 +106,7 @@ export interface NodeExecutionState {
   startTime?: string;
   endTime?: string;
   duration?: number;
-  result?: any;
+  result?: ToolResultData;
   error?: string;
 }
 
@@ -75,8 +116,19 @@ export interface WorkflowExecutionState {
   nodeStates: Record<string, NodeExecutionState>;
   overallProgress: number;
   executionOrder: string[];
-  results?: any;
+  results?: AnalysisExecutionInfo;
   error?: string;
+}
+
+export interface ToolExecutionResult {
+  status: 'started' | 'completed' | 'error';
+  result?: ToolResultData;
+  error?: Error | string;
+}
+
+export interface AnalysisExecutionInfo {
+  summary: string;
+  execution_info: ExecutionInfo;
 }
 
 export interface WebSocketMessage {
@@ -92,13 +144,10 @@ export interface WebSocketMessage {
   tool?: {
     name: string;
     status: 'started' | 'completed' | 'error';
-    result?: any;
-    error?: any;
+    result?: ToolResultData;
+    error?: Error | string;
   };
-  results?: {
-    summary: string;
-    execution_info: any;
-  };
+  results?: AnalysisExecutionInfo;
   ai_message?: string;
   error?: {
     message: string;

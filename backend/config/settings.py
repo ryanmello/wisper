@@ -19,9 +19,11 @@ class Settings:
     ALLOWED_ORIGINS: List[str] = [FRONTEND_URL, "http://localhost:3000"]
     
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
     
     TEMP_DIR_PREFIX: str = f"{PROJECT_NAME}_"
     
+    GITHUB_URL: str = "https://github.com"
     GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN")
     GITHUB_API_URL: str = os.getenv("GITHUB_API_URL", "https://api.github.com")
     GITHUB_DRY_RUN: bool = os.getenv("GITHUB_DRY_RUN", "false").lower() == "true"

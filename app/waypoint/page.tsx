@@ -18,6 +18,7 @@ import {
   WorkflowExecutionState,
   WebSocketMessage,
   NodeExecutionStatus,
+  NodeExecutionState,
 } from "@/lib/interface/waypoint-interface";
 import { WaypointAPI } from "@/lib/api/waypoint-api";
 import { GitHubRepository } from "@/lib/interface/github-interface";
@@ -26,9 +27,19 @@ import { Dialog } from "@/components/ui/dialog";
 import PlaybookDialog from "@/components/playbook/PlaybookDialog";
 import { PlaybookAPI } from "@/lib/api/playbook-api";
 import { Button } from "@/components/ui/button";
-import { Layers, X } from "lucide-react";
+import { Layers, X, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getToolIconByName, formatToolLabel, formatCategory } from "@/components/waypoint/ToolSidebar";
+
+// Tool type interface for drag and drop functionality
+interface DraggedToolType {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  iconColor: string;
+  category: string;
+  description: string;
+}
 
 export default function Waypoint() {
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
@@ -37,7 +48,7 @@ export default function Waypoint() {
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
   const [connections, setConnections] = useState<WaypointConnection[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [draggedTool, setDraggedTool] = useState<any>(null);
+  const [draggedTool, setDraggedTool] = useState<DraggedToolType | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStart, setConnectionStart] = useState<{
     nodeId: string;
@@ -349,6 +360,9 @@ export default function Waypoint() {
             case 'tool_error':
               if (message.tool?.name) {
                 const toolError = message.tool.error;
+                const errorMessage = message.error?.message || 
+                  (typeof toolError === 'string' ? toolError : toolError?.message) || 
+                  'Unknown error';
                 setNodes(currentNodes => {
                   const nodeId = currentNodes.find(node => node.tool_name === message.tool!.name)?.id;
                   if (nodeId) {
@@ -360,7 +374,7 @@ export default function Waypoint() {
                           ...prevState.nodeStates[nodeId],
                           status: 'failed' as NodeExecutionStatus,
                           endTime: message.timestamp,
-                          error: message.error?.message || toolError || 'Unknown error',
+                          error: errorMessage,
                         }
                       }
                     }));
@@ -399,8 +413,20 @@ export default function Waypoint() {
     };
   };
 
-  const handleToolDragStart = (tool: any) => {
-    setDraggedTool(tool);
+  const handleToolDragStart = (tool: {
+    id: string;
+    label: string;
+    icon: LucideIcon;
+    iconColor: string;
+    category: string;
+    description: string;
+  }) => {
+    // Convert the tool to our internal type (icon should already be LucideIcon in practice)
+    const draggedTool: DraggedToolType = {
+      ...tool,
+      icon: tool.icon as LucideIcon,
+    };
+    setDraggedTool(draggedTool);
   };
 
   const handleCanvasDrop = (e: React.DragEvent) => {
@@ -679,7 +705,7 @@ export default function Waypoint() {
       console.log('🔄 Calculated execution order:', executionOrder);
       
       // Initialize execution state
-      const initialNodeStates: Record<string, any> = {};
+      const initialNodeStates: Record<string, NodeExecutionState> = {};
       nodes.forEach(node => {
         initialNodeStates[node.id] = {
           nodeId: node.id,

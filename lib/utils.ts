@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { AIAnalysisRequest, AIAnalysisResponse, Task, ToolResult } from "./interface/cipher-interface";
+import { CipherRequest, CipherResponse, Task, ToolResult } from "./interface/cipher-interface";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -74,8 +74,8 @@ export function generateTaskTitle(prompt: string): string {
 }
 
 export function createTaskFromResponse(
-  response: AIAnalysisResponse,
-  request: AIAnalysisRequest
+  response: CipherResponse,
+  request: CipherRequest
 ): Task {
   const now = new Date().toISOString();
   return {

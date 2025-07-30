@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from models.api_models import AIAnalysisRequest, AIAnalysisResponse
+from models.api_models import CipherRequest, CipherResponse
 from services.analysis_service import analysis_service
 from config.settings import settings
 from utils.logging_config import get_logger
@@ -8,8 +8,8 @@ import uuid
 logger = get_logger(__name__)
 router = APIRouter()
 
-@router.post("/cipher", response_model=AIAnalysisResponse)
-async def analyze_repository(request: AIAnalysisRequest):
+@router.post("/cipher", response_model=CipherResponse)
+async def analyze_repository(request: CipherRequest):
     """
     Start AI-driven repository analysis based on a natural language prompt
     """
@@ -33,7 +33,7 @@ async def analyze_repository(request: AIAnalysisRequest):
         # Return response with WebSocket URL for monitoring
         websocket_url = f"ws://{settings.HOST}:{settings.PORT}/ws/cipher/{task_id}"
         
-        return AIAnalysisResponse(
+        return CipherResponse(
             task_id=task_id,
             status="analysis_started",
             websocket_url=websocket_url,

@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, field_validator
 from services.github_service import github_service
 from datetime import datetime
 
-class AIAnalysisRequest(BaseModel):
+class CipherRequest(BaseModel):
     """Request model for AI-driven analysis - just repository and prompt!"""
     repository_url: str = Field(..., description="GitHub repository URL")
     prompt: str = Field(..., min_length=10, max_length=1000, description="Natural language prompt describing what you want to analyze")
@@ -25,7 +25,7 @@ class AIAnalysisRequest(BaseModel):
             raise ValueError('Prompt must be less than 1000 characters')
         return v
 
-class AIAnalysisResponse(BaseModel):
+class CipherResponse(BaseModel):
     task_id: str = Field(..., description="Unique task identifier")
     status: str = Field(default="created", description="Task status")
     websocket_url: str = Field(..., description="WebSocket URL for real-time AI orchestration updates")

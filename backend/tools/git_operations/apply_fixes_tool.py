@@ -528,7 +528,8 @@ async def _send_to_ai(prompt: str, file_contents: Dict[str, str]) -> str:
     llm = ChatOpenAI(
         model="gpt-4", 
         temperature=0, 
-        api_key=settings.OPENAI_API_KEY
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL
     )
     
     response = await llm.ainvoke(messages)
@@ -652,7 +653,8 @@ async def _send_structured_vulnerabilities_to_ai(govulncheck_result: Govulncheck
     llm = ChatOpenAI(
         model="gpt-4", 
         temperature=0, 
-        api_key=settings.OPENAI_API_KEY
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL
     )
     
     response = await llm.ainvoke(messages)

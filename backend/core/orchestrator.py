@@ -13,7 +13,8 @@ class Orchestrator:
         self.llm = ChatOpenAI(
             model="gpt-4", 
             temperature=0, 
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL
         ).bind_tools(ALL_TOOLS)
         
         self.tools_map = {tool.name: tool for tool in ALL_TOOLS}

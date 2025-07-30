@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useAuth } from "./auth-context";
 import { createTaskFromResponse, updateToolResults } from "@/lib/utils";
-import { AIAnalysisRequest, StandardWebSocketMessage, Task, ToolResult } from "@/lib/interface/cipher-interface";
+import { CipherRequest, StandardWebSocketMessage, Task, ToolResult } from "@/lib/interface/cipher-interface";
 import { CipherAPI } from "@/lib/api/cipher-api";
 
 interface TaskState {
@@ -43,7 +43,7 @@ interface TaskContextType {
   isLoading: boolean;
   error: string | null;
 
-  createTask: (request: AIAnalysisRequest) => Promise<Task | null>;
+  createTask: (request: CipherRequest) => Promise<Task | null>;
   updateTask: (id: string, updates: Partial<Task>) => void;
   deleteTask: (id: string) => void;
   archiveTask: (id: string) => void;
@@ -488,7 +488,7 @@ export function TaskProvider({ children }: TaskProviderProps) {
   // ========================================
 
   const createTask = useCallback(
-    async (request: AIAnalysisRequest): Promise<Task | null> => {
+    async (request: CipherRequest): Promise<Task | null> => {
       dispatch({ type: "set_loading", payload: true });
       dispatch({ type: "set_error", payload: null });
 
