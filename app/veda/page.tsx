@@ -344,7 +344,13 @@ export default function Veda() {
 
       ws.onclose = () => {
         console.log("Veda analysis WebSocket closed");
-        setVedaAnalysisProgress("");
+        // Only clear progress if analysis hasn't completed yet
+        setVedaAnalysisCompleted(currentCompleted => {
+          if (!currentCompleted) {
+            setVedaAnalysisProgress("");
+          }
+          return currentCompleted;
+        });
       };
 
       ws.onerror = (error) => {

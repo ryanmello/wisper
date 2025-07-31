@@ -73,7 +73,6 @@ async def get_user_repositories(request: GetRepositoriesRequest):
         # Parameters for the repositories endpoint
         params = {
             "visibility": "all",  # Include both public and private repos
-            "affiliation": "owner,collaborator",  # Include owned and collaborated repos
             "sort": request.sort,
             "direction": request.direction,
             "page": request.page,

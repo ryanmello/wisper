@@ -14,7 +14,9 @@ logger = get_logger(__name__)
 @tool_category("reporting")
 @tool
 def generate_summary(tool_results: Any) -> StandardToolResponse:
-    """Generate summary of all previous tool calls.
+    """Generate summary of all tool calls.
+
+    Generate summary of all previous tool calls.
     
     Args:
         tool_results: Results from previously executed tools.

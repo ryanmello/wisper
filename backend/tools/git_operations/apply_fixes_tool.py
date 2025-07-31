@@ -549,7 +549,10 @@ async def _send_structured_vulnerabilities_to_ai(govulncheck_result: Govulncheck
     for vuln in govulncheck_result.vulnerabilities:
         if vuln.is_standard_library:
             # Standard library vulnerability - need Go version update
-            go_version_updates.append(f"  - Update Go version from {vuln.current_version} to {vuln.fixed_version} (fixes {vuln.vuln_id})")
+            # Convert "go1.24.2" to "go 1.24.2" format to match go.mod
+            current_formatted = vuln.current_version.replace("go", "go ", 1) if vuln.current_version.startswith("go") else vuln.current_version
+            fixed_formatted = vuln.fixed_version.replace("go", "go ", 1) if vuln.fixed_version.startswith("go") else vuln.fixed_version
+            go_version_updates.append(f"  - Update Go version from {current_formatted} to {fixed_formatted} (fixes {vuln.vuln_id})")
         else:
             # Third-party dependency update
             dependency_updates.append(f"  - Update {vuln.module_name} from {vuln.current_version} to {vuln.fixed_version} (fixes {vuln.vuln_id})")

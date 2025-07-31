@@ -1,6 +1,5 @@
 import os
 import subprocess
-import tempfile
 import shutil
 from typing import Dict, Optional
 from dataclasses import dataclass
@@ -25,7 +24,7 @@ class BuildValidator:
     
     def validate_fixes(self, repo_path: str, updated_files: Dict[str, str]) -> BuildResult:
         """
-        Validate fixes by applying them and running go build.
+        Validate fixes by applying them to the repository and running go build.
         
         Args:
             repo_path: Path to the repository
@@ -34,21 +33,39 @@ class BuildValidator:
         Returns:
             BuildResult indicating success/failure
         """
-        temp_dir = None
+        backup_files = {}
         try:
-            # Create a temporary copy of the repository
-            temp_dir = tempfile.mkdtemp(prefix=f"{settings.PROJECT_NAME}_build_validation_")
-            logger.info(f"Created temporary directory for build validation: {temp_dir}")
+            logger.info(f"Validating fixes in repository: {repo_path}")
             
-            # Copy repository to temp directory
-            self._copy_repository(repo_path, temp_dir)
+            # Create backup of files we're about to modify
+            for file_path in updated_files.keys():
+                full_path = os.path.join(repo_path, file_path)
+                if os.path.exists(full_path):
+                    try:
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            backup_files[file_path] = f.read()
+                        logger.debug(f"Backed up original content of {file_path}")
+                    except Exception as e:
+                        logger.warning(f"Could not backup {file_path}: {e}")
             
-            # Apply the fixes to the temporary copy
-            self._apply_fixes(temp_dir, updated_files)
+            # Remember original go.sum for comparison
+            original_go_sum = None
+            go_sum_path = os.path.join(repo_path, "go.sum")
+            if os.path.exists(go_sum_path):
+                try:
+                    with open(go_sum_path, 'r', encoding='utf-8') as f:
+                        original_go_sum = f.read()
+                except Exception as e:
+                    logger.warning(f"Could not read original go.sum: {e}")
+            
+            # Apply the fixes to the repository
+            self._apply_fixes(repo_path, updated_files)
             
             # Run go mod tidy first
-            tidy_result = self._run_go_mod_tidy(temp_dir)
+            tidy_result = self._run_go_mod_tidy(repo_path)
             if not tidy_result.success:
+                # Restore backups on failure
+                self._restore_backups(repo_path, backup_files)
                 return BuildResult(
                     success=False,
                     build_output=tidy_result.build_output,
@@ -56,72 +73,58 @@ class BuildValidator:
                 )
             
             # Run go build
-            build_result = self._run_go_build(temp_dir)
+            build_result = self._run_go_build(repo_path)
             
-            # If validation succeeded, capture updated go.sum content
-            if build_result.success:
-                go_sum_path = os.path.join(temp_dir, "go.sum")
-                if os.path.exists(go_sum_path):
-                    try:
-                        with open(go_sum_path, 'r', encoding='utf-8') as f:
-                            updated_go_sum = f.read()
-                        
-                        # Check if go.sum actually changed by comparing with original
-                        original_go_sum_path = os.path.join(repo_path, "go.sum")
-                        if os.path.exists(original_go_sum_path):
-                            with open(original_go_sum_path, 'r', encoding='utf-8') as f:
-                                original_go_sum = f.read()
-                            if updated_go_sum != original_go_sum:
-                                build_result.updated_go_sum = updated_go_sum
-                                logger.info("Captured updated go.sum content")
-                        else:
-                            # go.sum was created new by go mod tidy
-                            build_result.updated_go_sum = updated_go_sum  
+            # If validation failed, restore backups
+            if not build_result.success:
+                self._restore_backups(repo_path, backup_files)
+                return build_result
+            
+            # If validation succeeded, capture updated go.sum content if it changed
+            if os.path.exists(go_sum_path):
+                try:
+                    with open(go_sum_path, 'r', encoding='utf-8') as f:
+                        updated_go_sum = f.read()
+                    
+                    if updated_go_sum != original_go_sum:
+                        build_result.updated_go_sum = updated_go_sum
+                        if original_go_sum is None:
                             logger.info("Captured newly created go.sum content")
-                    except Exception as e:
-                        logger.warning(f"Could not capture updated go.sum: {e}")
+                        else:
+                            logger.info("Captured updated go.sum content")
+                except Exception as e:
+                    logger.warning(f"Could not capture updated go.sum: {e}")
             
             logger.info(f"Build validation {'succeeded' if build_result.success else 'failed'}")
             return build_result
             
         except Exception as e:
             logger.error(f"Build validation failed with exception: {e}")
+            # Restore backups on exception
+            self._restore_backups(repo_path, backup_files)
             return BuildResult(
                 success=False,
                 build_output="",
                 error_message=f"Validation exception: {str(e)}"
             )
-        finally:
-            # Clean up temporary directory
-            if temp_dir and os.path.exists(temp_dir):
-                try:
-                    shutil.rmtree(temp_dir)
-                    logger.debug(f"Cleaned up temporary directory: {temp_dir}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up temporary directory: {e}")
     
-    def _copy_repository(self, source_path: str, dest_path: str):
-        """Copy repository to temporary directory."""
-        logger.debug(f"Copying repository from {source_path} to {dest_path}")
-        
-        # Copy all files except common ignore patterns
-        ignore_patterns = {
-            '.git', '__pycache__', 'node_modules', '.vscode', '.idea',
-            'vendor', 'dist', 'build', '.next', 'coverage'
-        }
-        
-        for item in os.listdir(source_path):
-            if item not in ignore_patterns:
-                source_item = os.path.join(source_path, item)
-                dest_item = os.path.join(dest_path, item)
-                
-                if os.path.isdir(source_item):
-                    shutil.copytree(source_item, dest_item)
-                else:
-                    shutil.copy2(source_item, dest_item)
+    def _restore_backups(self, repo_path: str, backup_files: Dict[str, str]):
+        """Restore backed up files in case of validation failure."""
+        if not backup_files:
+            return
+            
+        logger.info(f"Restoring {len(backup_files)} backed up files")
+        for file_path, original_content in backup_files.items():
+            try:
+                full_path = os.path.join(repo_path, file_path)
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(original_content)
+                logger.debug(f"Restored original content of {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to restore backup of {file_path}: {e}")
     
     def _apply_fixes(self, repo_path: str, updated_files: Dict[str, str]):
-        """Apply fixes to the repository copy."""
+        """Apply fixes to the repository."""
         logger.info(f"Applying {len(updated_files)} file updates")
         
         for file_path, new_content in updated_files.items():
