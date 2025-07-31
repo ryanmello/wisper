@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import Canvas from "@/components/waypoint/Canvas";
 import ToolSidebar from "@/components/waypoint/ToolSidebar";
@@ -42,8 +42,9 @@ interface DraggedToolType {
 }
 
 export default function Waypoint() {
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const { isLoading: isAuthLoading, isAuthenticated, getToken } = useAuth();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [nodes, setNodes] = useState<WaypointNode[]>([]);
   const [connections, setConnections] = useState<WaypointConnection[]>([]);
@@ -223,7 +224,11 @@ export default function Waypoint() {
   const fetchUserRepositories = async () => {
     try {
       setIsLoading(true);
-      const response = await GitHubAPI.getRepositories();
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+      const response = await GitHubAPI.getRepositories({ token });
       setRepositories(response.repositories);
     } catch (err) {
       setError(
@@ -234,8 +239,14 @@ export default function Waypoint() {
     }
   };
 
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
   if (isAuthLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) return <AuthLoadingScreen />;
 
   const resetVerificationStatus = () => {
     setVerificationStatus("idle");

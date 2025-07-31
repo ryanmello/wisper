@@ -16,6 +16,7 @@ export interface GitHubRepository {
 }
 
 export interface GetRepositoriesRequest {
+  token: string;
   page?: number;
   per_page?: number;
   sort?: string;
@@ -27,6 +28,10 @@ export interface GetRepositoriesResponse {
   repositories: GitHubRepository[];
   page: number;
   per_page: number;
+}
+
+export interface GetUserRequest {
+  token: string;
 }
 
 export interface GitHubUser {
@@ -58,6 +63,7 @@ export interface GitHubPullRequest {
 }
 
 export interface GetPullRequestsRequest {
+  token: string;
   repo_owner: string;
   repo_name: string;
   page?: number;
@@ -85,6 +91,7 @@ export interface GitHubFileChange {
 }
 
 export interface GetPullRequestFilesRequest {
+  token: string;
   pr_id: number;
   repo_owner: string;
   repo_name: string;
@@ -107,6 +114,7 @@ export interface GitHubComment {
 }
 
 export interface GetPullRequestCommentsRequest {
+  token: string;
   pr_id: number;
   repo_owner: string;
   repo_name: string;
@@ -123,6 +131,7 @@ export interface GetPullRequestCommentsResponse {
 }
 
 export interface PostPullRequestCommentRequest {
+  token: string;
   pr_id: number;
   repo_owner: string;
   repo_name: string;

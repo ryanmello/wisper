@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (token: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  getToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,23 +32,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch user data from backend API
+  // Fetch user data using GitHubAPI
   const fetchUser = async (token: string): Promise<GitHubUser | null> => {
     try {
-      const response = await fetch("http://localhost:8000/user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      if (response.ok) {
-        const body = await response.json()
-        console.log(body)
-        return body;
-      }
-      return null;
+      // We need to import GitHubAPI at the top of the file
+      const { GitHubAPI } = await import("@/lib/api/github-api");
+      const userData = await GitHubAPI.getUser({ token });
+      return userData;
     } catch (error) {
       console.error("Failed to fetch user data:", error);
       return null;
@@ -99,9 +90,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     router.push('/sign-in');
   };
 
+  // Get token from localStorage
+  const getToken = (): string | null => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    return localStorage.getItem("github_token");
+  };
+
   // Refresh user data
   const refreshUser = async () => {
-    const token = localStorage.getItem("github_token");
+    const token = getToken();
     if (token) {
       try {
         const userData = await fetchUser(token);
@@ -120,6 +119,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Initialize auth state on mount
   useEffect(() => {
     const initializeAuth = async () => {
+      // Check if we're in a browser environment
+      if (typeof window === 'undefined') {
+        setIsLoading(false);
+        return;
+      }
+
       const token = localStorage.getItem("github_token");
       
       if (token) {
@@ -134,7 +139,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
             removeToken();
           }
         } catch (error) {
+          console.error("Failed to validate token:", error);
+          // If the backend is unreachable or token is invalid, remove it
           removeToken();
+          // Don't throw the error, just log it and continue
         }
       }
       
@@ -151,6 +159,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     logout,
     refreshUser,
+    getToken,
   };
 
   return (

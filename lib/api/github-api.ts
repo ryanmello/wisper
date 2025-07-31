@@ -7,14 +7,42 @@ import {
   GetPullRequestsResponse,
   GetRepositoriesRequest,
   GetRepositoriesResponse,
+  GetUserRequest,
+  GitHubUser,
   PostPullRequestCommentRequest,
   PostPullRequestCommentResponse,
 } from "../interface/github-interface";
 import { API_BASE_URL } from "../utils";
 
 export class GitHubAPI {
+  static async getUser(request: GetUserRequest): Promise<GitHubUser> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          `Failed to fetch user: ${response.status} ${
+            response.statusText
+          }${errorData.detail ? ` - ${errorData.detail}` : ""}`
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      throw error;
+    }
+  }
+
   static async getRepositories(
-    request: GetRepositoriesRequest = {}
+    request: GetRepositoriesRequest
   ): Promise<GetRepositoriesResponse> {
     try {
       const response = await fetch(`${API_BASE_URL}/repositories`, {
@@ -23,11 +51,11 @@ export class GitHubAPI {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          page: 1,
-          per_page: 30,
-          sort: "updated",
-          direction: "desc",
-          ...request,
+          token: request.token,
+          page: request.page || 1,
+          per_page: request.per_page || 30,
+          sort: request.sort || "updated",
+          direction: request.direction || "desc",
         }),
       });
 
@@ -57,10 +85,12 @@ export class GitHubAPI {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          page: 1,
-          per_page: 30,
-          state: "all",
-          ...request,
+          token: request.token,
+          repo_owner: request.repo_owner,
+          repo_name: request.repo_name,
+          page: request.page || 1,
+          per_page: request.per_page || 30,
+          state: request.state || "all",
         }),
       });
 
@@ -89,7 +119,12 @@ export class GitHubAPI {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(request),
+        body: JSON.stringify({
+          token: request.token,
+          pr_id: request.pr_id,
+          repo_owner: request.repo_owner,
+          repo_name: request.repo_name,
+        }),
       });
 
       if (!response.ok) {
@@ -118,9 +153,12 @@ export class GitHubAPI {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          page: 1,
-          per_page: 30,
-          ...request,
+          token: request.token,
+          pr_id: request.pr_id,
+          repo_owner: request.repo_owner,
+          repo_name: request.repo_name,
+          page: request.page || 1,
+          per_page: request.per_page || 30,
         }),
       });
 
@@ -151,7 +189,13 @@ export class GitHubAPI {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(request),
+          body: JSON.stringify({
+            token: request.token,
+            pr_id: request.pr_id,
+            repo_owner: request.repo_owner,
+            repo_name: request.repo_name,
+            body: request.body,
+          }),
         }
       );
 

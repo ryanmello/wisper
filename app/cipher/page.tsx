@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
@@ -20,6 +20,12 @@ const CipherPage = () => {
 
   const [activeTab, setActiveTab] = useState<"tasks" | "archived">("tasks");
 
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
   const handleTaskClick = (taskId: string) => {
     router.push(`/cipher/${taskId}`);
   };
@@ -32,7 +38,7 @@ const CipherPage = () => {
   };
 
   if (isAuthLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) return <AuthLoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pt-32 p-4">

@@ -53,15 +53,14 @@ async def get_user(request: GetUserRequest):
 @router.post("/repositories", response_model=GetRepositoriesResponse)
 async def get_user_repositories(request: GetRepositoriesRequest):
     """
-    Get authenticated user's repositories using GitHub token from settings
+    Get authenticated user's repositories using GitHub token from request
     """
     try:
-        # Use token from settings
-        if not settings.GITHUB_TOKEN:
-            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        # Use token from request
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
         
-        token = settings.GITHUB_TOKEN
-        logger.info(token)
+        token = request.token
         
         # GitHub API endpoint for user repositories
         url = f"{settings.GITHUB_API_URL}/user/repos"
@@ -123,14 +122,14 @@ async def get_user_repositories(request: GetRepositoriesRequest):
 @router.post("/pull_requests", response_model=GetPullRequestsResponse)
 async def get_pull_requests(request: GetPullRequestsRequest):
     """
-    Get pull requests for a repository using GitHub token from settings
+    Get pull requests for a repository using GitHub token from request
     """
     try:
-        # Use token from settings
-        if not settings.GITHUB_TOKEN:
-            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        # Use token from request
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
         
-        token = settings.GITHUB_TOKEN
+        token = request.token
         
         # GitHub API endpoint for repository pull requests
         url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/pulls"
@@ -200,14 +199,14 @@ async def get_pull_requests(request: GetPullRequestsRequest):
 @router.post("/pull_requests/files", response_model=GetPullRequestFilesResponse)
 async def get_pull_request_files(request: GetPullRequestFilesRequest):
     """
-    Get file changes for a specific pull request
+    Get file changes for a specific pull request using GitHub token from request
     """
     try:
-        # Use token from settings
-        if not settings.GITHUB_TOKEN:
-            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        # Use token from request
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
         
-        token = settings.GITHUB_TOKEN
+        token = request.token
         
         # GitHub API endpoint for PR files
         url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/pulls/{request.pr_id}/files"
@@ -259,14 +258,14 @@ async def get_pull_request_files(request: GetPullRequestFilesRequest):
 @router.post("/pull_requests/comments", response_model=GetPullRequestCommentsResponse)
 async def get_pull_request_comments(request: GetPullRequestCommentsRequest):
     """
-    Get comments for a specific pull request
+    Get comments for a specific pull request using GitHub token from request
     """
     try:
-        # Use token from settings
-        if not settings.GITHUB_TOKEN:
-            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        # Use token from request
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
         
-        token = settings.GITHUB_TOKEN
+        token = request.token
         
         # GitHub API endpoint for PR comments
         url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"
@@ -325,14 +324,14 @@ async def get_pull_request_comments(request: GetPullRequestCommentsRequest):
 @router.post("/pull_requests/comments/create", response_model=PostPullRequestCommentResponse)
 async def post_pull_request_comment(request: PostPullRequestCommentRequest):
     """
-    Post a comment to a specific pull request
+    Post a comment to a specific pull request using GitHub token from request
     """
     try:
-        # Use token from settings
-        if not settings.GITHUB_TOKEN:
-            raise HTTPException(status_code=500, detail="GitHub token not configured")
+        # Use token from request
+        if not request.token:
+            raise HTTPException(status_code=400, detail="GitHub token is required")
         
-        token = settings.GITHUB_TOKEN
+        token = request.token
         
         # GitHub API endpoint for posting PR comments
         url = f"{settings.GITHUB_API_URL}/repos/{request.repo_owner}/{request.repo_name}/issues/{request.pr_id}/comments"

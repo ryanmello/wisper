@@ -53,8 +53,14 @@ export default function Playbook() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
   if (isAuthLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) return <AuthLoadingScreen />;
 
   const handleRunPlaybook = async (playbook: Playbook) => {
     if (playbook.type === "cipher") {

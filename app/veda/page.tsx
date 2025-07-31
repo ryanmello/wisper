@@ -33,7 +33,7 @@ import Image from "next/image";
 
 export default function Veda() {
   // Auth context
-  const { user } = useAuth();
+  const { user, getToken } = useAuth();
 
   // Repository state
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
@@ -85,7 +85,11 @@ export default function Veda() {
     try {
       setLoading(true);
       setRepoError(null);
-      const response = await GitHubAPI.getRepositories();
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+      const response = await GitHubAPI.getRepositories({ token });
       setRepositories(response.repositories || []);
     } catch (err) {
       setRepoError(
@@ -121,8 +125,13 @@ export default function Veda() {
     try {
       setLoading(true);
       setPrError(null);
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const repoOwner = repo.full_name.split("/")[0];
       const response = await GitHubAPI.getPullRequests({
+        token,
         repo_owner: repoOwner,
         repo_name: repo.name,
         state: "all",
@@ -170,7 +179,12 @@ export default function Veda() {
   // Fetch file changes for selected pull request
   const fetchFileChanges = async (pr: GitHubPullRequest) => {
     try {
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const response = await GitHubAPI.getPullRequestFiles({
+        token,
         pr_id: pr.id,
         repo_owner: pr.repository.owner,
         repo_name: pr.repository.name,
@@ -210,7 +224,12 @@ export default function Veda() {
   // Fetch comments for selected pull request
   const fetchComments = async (pr: GitHubPullRequest) => {
     try {
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
       const response = await GitHubAPI.getPullRequestComments({
+        token,
         pr_id: pr.id,
         repo_owner: pr.repository.owner,
         repo_name: pr.repository.name,
@@ -250,8 +269,14 @@ export default function Veda() {
 
     try {
       // Make both API calls simultaneously
+      const token = getToken();
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+      
       const [githubResponse, vedaResponse] = await Promise.all([
         GitHubAPI.postPullRequestComment({
+          token,
           pr_id: selectedPR.id,
           repo_owner: selectedPR.repository.owner,
           repo_name: selectedPR.repository.name,

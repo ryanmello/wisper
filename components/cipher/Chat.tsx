@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
+import { useAuth } from "@/context/auth-context";
 import { AlertCircle, ArrowUpRight, Layers } from "lucide-react";
 import RepoDropdown from "./RepoDropdown";
 import { GitHubRepository } from "@/lib/interface/github-interface";
@@ -23,6 +24,7 @@ export function Chat({ isAuthenticated }: ChatProps) {
     error: taskError,
     clearError,
   } = useTask();
+  const { getToken } = useAuth();
 
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -63,7 +65,12 @@ export function Chat({ isAuthenticated }: ChatProps) {
 
       try {
         setRepoError(null);
+        const token = getToken();
+        if (!token) {
+          throw new Error("No authentication token found");
+        }
         const response = await GitHubAPI.getRepositories({
+          token,
           sort: "updated",
           per_page: 50,
         });

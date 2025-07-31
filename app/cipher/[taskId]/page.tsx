@@ -367,8 +367,14 @@ const TaskDetailPage = ({ params }: TaskPageProps) => {
     );
   };
 
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
+
   if (isAuthLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) return <AuthLoadingScreen />;
 
   if (isLoading) {
     return (

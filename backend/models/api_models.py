@@ -57,6 +57,7 @@ class GitHubRepository(BaseModel):
 
 class GetRepositoriesRequest(BaseModel):
     """Request model for getting user repositories"""
+    token: str = Field(..., description="GitHub personal access token")
     page: int = Field(1, ge=1, description="Page number for pagination")
     per_page: int = Field(30, ge=1, le=100, description="Number of repositories per page")
     sort: str = Field("updated", description="Sort by: created, updated, pushed, full_name")
@@ -89,6 +90,7 @@ class GitHubPullRequest(BaseModel):
 
 class GetPullRequestsRequest(BaseModel):
     """Request model for getting pull requests"""
+    token: str = Field(..., description="GitHub personal access token")
     repo_owner: str = Field(..., description="Repository owner")
     repo_name: str = Field(..., description="Repository name")
     page: int = Field(1, ge=1, description="Page number for pagination")
@@ -116,6 +118,7 @@ class GitHubFileChange(BaseModel):
 
 class GetPullRequestFilesRequest(BaseModel):
     """Request model for getting pull request files"""
+    token: str = Field(..., description="GitHub personal access token")
     pr_id: int = Field(..., description="Pull request ID")
     repo_owner: str = Field(..., description="Repository owner")
     repo_name: str = Field(..., description="Repository name")
@@ -138,6 +141,7 @@ class GitHubComment(BaseModel):
 
 class GetPullRequestCommentsRequest(BaseModel):
     """Request model for getting pull request comments"""
+    token: str = Field(..., description="GitHub personal access token")
     pr_id: int = Field(..., description="Pull request ID")
     repo_owner: str = Field(..., description="Repository owner")
     repo_name: str = Field(..., description="Repository name")
@@ -154,6 +158,7 @@ class GetPullRequestCommentsResponse(BaseModel):
 
 class PostPullRequestCommentRequest(BaseModel):
     """Request model for posting pull request comment"""
+    token: str = Field(..., description="GitHub personal access token")
     pr_id: int = Field(..., description="Pull request ID")
     repo_owner: str = Field(..., description="Repository owner")
     repo_name: str = Field(..., description="Repository name")

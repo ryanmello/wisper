@@ -1,6 +1,8 @@
 import os
 import time
+import re
 from datetime import datetime
+from typing import Optional, Union
 from langchain_core.tools import tool
 from git import Repo
 from utils.logging_config import get_logger
@@ -9,32 +11,40 @@ from services.github_service import github_service
 from config.settings import settings
 from models.api_models import StandardToolResponse, StandardMetrics, StandardError
 
+"""Common workflow: analyze_issues → apply_fixes → create_pull_request"""
+
 logger = get_logger(__name__)
 
 @tool_category("git_operations")
 @tool
-def create_pull_request(repository_path: str, branch_name: str, title: str, description: str, commit_message: str) -> StandardToolResponse:
+def create_pull_request(repository_path: str, branch_name: str, title: str, description: str, commit_message: str, vulnerability_scan_output: Optional[Union[str, StandardToolResponse]] = None) -> StandardToolResponse:
     """Create a GitHub pull request.
     
     This tool creates a new branch, commits existing changes, and opens a pull request on the original repository. 
-    It assumes files have already been modified by other tools (typically apply_fixes tool) and focuses on the 
-    git operations: commit → push → create PR.
+    It assumes files have already been modified by other tools and focuses on the git operations: commit → push → create PR.
     
-    Prerequisites: Repository must be cloned; files should already be modified by other tools
-    Common workflow: analyze_issues → apply_fixes → create_pull_request
+    When vulnerability_scan_output is provided, the tool automatically generates a detailed security-focused 
+    description that includes structured information about vulnerabilities found and fixed.
+    
+    Prerequisites: Repository must be cloned; files should already be modified by other tools.
     
     Args:
         repository_path: Path to the cloned repository with modified files
         branch_name: Name for the new branch containing the changes
-        title: Title for the pull request
-        description: Detailed description of the changes and their purpose
+        title: Detailed title for the pull request that include all major changes
+        description: Detailed description of the changes and their purpose (used as fallback if no scan output)
         commit_message: Descriptive commit message for the changes
+        vulnerability_scan_output: Optional output from vulnerability scanning tools (e.g., govulncheck) to generate detailed security descriptions. Can be either raw string output or StandardToolResponse object
         
     Returns:
         StandardToolResponse with pull request URL, status, and details of the created PR
     """
     start_time = time.time()
     logger.info(f"Creating pull request for {repository_path}")
+    
+    # Generate detailed description from vulnerability scan output if provided
+    if vulnerability_scan_output:
+        description = vulnerability_scan_output
     
     try:
         if not os.path.exists(repository_path):

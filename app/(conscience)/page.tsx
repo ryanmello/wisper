@@ -3,12 +3,21 @@
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import { useAuth } from "@/context/auth-context";
 import { Fingerprint, Flower, Layers, Sparkles, Waypoints } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 const Conscience = () => {
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push('/sign-in');
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
 
   if (isAuthLoading) return <AuthLoadingScreen />;
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated) return <AuthLoadingScreen />;
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
