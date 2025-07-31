@@ -25,6 +25,7 @@ import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
 import { Dialog } from "@/components/ui/dialog";
 import PlaybookDialog from "@/components/playbook/PlaybookDialog";
+import WorkflowResultsSheet from "@/components/waypoint/WorkflowResultsSheet";
 import { PlaybookAPI } from "@/lib/api/playbook-api";
 import { Button } from "@/components/ui/button";
 import { Layers, X, type LucideIcon } from "lucide-react";
@@ -79,6 +80,7 @@ export default function Waypoint() {
 
   const [executionState, setExecutionState] = useState<WorkflowExecutionState>({
     isRunning: false,
+    isCompleted: false,
     nodeStates: {},
     overallProgress: 0,
     executionOrder: [],
@@ -89,6 +91,7 @@ export default function Waypoint() {
   // Force connection position updates after execution state changes
   const [connectionUpdateKey, setConnectionUpdateKey] = useState(0);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [showResultsSheet, setShowResultsSheet] = useState(false);
 
   useEffect(() => {
     fetchUserRepositories();
@@ -257,11 +260,13 @@ export default function Waypoint() {
   const resetExecutionState = () => {
     setExecutionState({
       isRunning: false,
+      isCompleted: false,
       nodeStates: {},
       overallProgress: 0,
       executionOrder: [],
     });
     setCurrentTaskId(null);
+    setShowResultsSheet(false);
   };
 
   // WebSocket connection management - inline handlers to avoid hook order issues
@@ -397,8 +402,10 @@ export default function Waypoint() {
               
             case 'analysis_completed':
               newState.isRunning = false;
+              newState.isCompleted = true;
               newState.overallProgress = 100;
               newState.results = message.results;
+              newState.completedAt = message.timestamp;
               break;
               
             case 'analysis_error':
@@ -734,6 +741,7 @@ export default function Waypoint() {
 
       setExecutionState({
         isRunning: true,
+        isCompleted: false,
         nodeStates: initialNodeStates,
         overallProgress: 0,
         executionOrder: executionOrder,
@@ -774,6 +782,16 @@ export default function Waypoint() {
     console.log("Waypoint playbook saved with ID:", playbookId);
     setSaveDialogOpen(false);
     // Toast is handled in the dialog component
+  };
+
+  const handleViewResults = () => {
+    setShowResultsSheet(true);
+  };
+
+  const handleRunAgain = () => {
+    setShowResultsSheet(false);
+    resetExecutionState();
+    resetVerificationStatus();
   };
 
   return (
@@ -817,6 +835,7 @@ export default function Waypoint() {
               onStart={handleStart}
               onStop={handleStop}
               onSavePlaybook={handleSavePlaybook}
+              onViewResults={handleViewResults}
               verificationStatus={verificationStatus}
               verificationMessage={verificationMessage}
               isStartEnabled={isStartEnabled}
@@ -833,6 +852,15 @@ export default function Waypoint() {
                 onSuccess={handleSaveSuccess}
               />
             </Dialog>
+
+            {/* Workflow Results Sheet */}
+            <WorkflowResultsSheet
+              open={showResultsSheet}
+              onOpenChange={setShowResultsSheet}
+              executionState={executionState}
+              nodes={nodes}
+              onRunAgain={handleRunAgain}
+            />
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>

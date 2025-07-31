@@ -112,12 +112,14 @@ export interface NodeExecutionState {
 
 export interface WorkflowExecutionState {
   isRunning: boolean;
+  isCompleted: boolean;
   currentTool?: string;
   nodeStates: Record<string, NodeExecutionState>;
   overallProgress: number;
   executionOrder: string[];
   results?: AnalysisExecutionInfo;
   error?: string;
+  completedAt?: string;
 }
 
 export interface ToolExecutionResult {

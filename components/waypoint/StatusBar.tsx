@@ -8,6 +8,7 @@ import {
   Square,
   BookMarked,
   Layers,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,7 @@ interface StatusBarProps {
   onStart: () => void;
   onStop?: () => void;
   onSavePlaybook?: () => void;
+  onViewResults?: () => void;
   verificationStatus: "idle" | "verifying" | "success" | "error";
   verificationMessage?: string;
   isStartEnabled: boolean;
@@ -44,6 +46,7 @@ const StatusBar = ({
   onStart,
   onStop,
   onSavePlaybook,
+  onViewResults,
   verificationStatus,
   verificationMessage,
   isStartEnabled,
@@ -148,11 +151,6 @@ const StatusBar = ({
                   </span>
                 </div>
               )}
-              {!isFinalizingState && (
-                <div className="text-xs text-gray-500">
-                  {executionState.overallProgress}% complete
-                </div>
-              )}
               {isFinalizingState && (
                 <div className="text-xs text-purple-600">
                   Processing results...
@@ -225,7 +223,7 @@ const StatusBar = ({
               )}
             </Button>
 
-            {/* Start/Stop Workflow Button */}
+            {/* Start/Stop/View Results Workflow Button */}
             {executionState.isRunning ? (
               isFinalizingState ? (
                 <Button
@@ -248,6 +246,16 @@ const StatusBar = ({
                   <span className="font-semibold">Stop Workflow</span>
                 </Button>
               )
+            ) : executionState.isCompleted ? (
+              <Button
+                onClick={onViewResults}
+                variant="outline"
+                size="sm"
+                className="relative overflow-hidden bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border-blue-200 text-blue-700 hover:text-blue-800 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                <span className="font-semibold">View Results</span>
+              </Button>
             ) : (
               <Button
                 onClick={onStart}

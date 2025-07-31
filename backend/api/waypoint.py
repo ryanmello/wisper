@@ -48,6 +48,9 @@ async def start_workflow(request: StartWorkflowRequest):
         Please execute the tools in the order in which they are connected. 
         If tool_2 connects to tool_3 and tool_1 connects to tool_2. The order is tool_1, tool_2, tool_3.
 
+        Do not execute any tools that are not explicitly mentioned in the nodes or connections.
+        You are required to only execute the tools in the nodes and execute them in the order of the connections.
+
         Nodes: {[{"id": node.id, "tool_name": node.tool_name} for node in request.nodes]}
         Connections: {[{"source": conn.source_tool_name, "target": conn.target_tool_name} for conn in request.connections]}
         
