@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import React from "react";
 import { CipherRequest, CipherResponse, Task, ToolResult } from "./interface/cipher-interface";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -122,3 +123,94 @@ export function updateToolResults(
     return [...currentResults, { name: toolName, ...updates } as ToolResult];
   }
 }
+
+export const formatSummaryText = (text: string): React.ReactNode[] | null => {
+  if (!text) return null;
+  
+  const lines = text.split('\n').filter(line => line.trim());
+  const elements: React.ReactNode[] = [];
+  
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    
+    // Main headers (###)
+    if (trimmed.startsWith('### ')) {
+      elements.push(
+        React.createElement('h3', {
+          key: index,
+          className: "text-lg font-bold mt-4 mb-2 first:mt-0"
+        }, trimmed.replace('### ', ''))
+      );
+    }
+    // Sub headers (####)
+    else if (trimmed.startsWith('#### ')) {
+      elements.push(
+        React.createElement('h4', {
+          key: index,
+          className: "text-base font-semibold mt-3 mb-2"
+        }, trimmed.replace('#### ', ''))
+      );
+    }
+    // Horizontal rules
+    else if (trimmed === '---') {
+      elements.push(
+        React.createElement('hr', {
+          key: index,
+          className: "my-4"
+        })
+      );
+    }
+    // Numbered lists
+    else if (/^\d+\.\s/.test(trimmed)) {
+      elements.push(
+        React.createElement('div', {
+          key: index,
+          className: "ml-4 mb-1"
+        }, React.createElement('span', {
+          className: "font-medium"
+        }, trimmed))
+      );
+    }
+    // Bullet points with dashes
+    else if (trimmed.startsWith('- ')) {
+      elements.push(
+        React.createElement('div', {
+          key: index,
+          className: "ml-6 mb-1 flex items-start gap-2"
+        }, [
+          React.createElement('div', {
+            key: 'bullet',
+            className: "w-1 h-1 rounded-full mt-2 flex-shrink-0"
+          }),
+          React.createElement('span', {
+            key: 'text',
+          }, trimmed.replace('- ', ''))
+        ])
+      );
+    }
+    // Bold text patterns
+    else if (trimmed.includes('**')) {
+      const parts = trimmed.split('**');
+      const formattedParts = parts.map((part, i) => 
+        i % 2 === 1 ? React.createElement('strong', { key: i, className: "font-semibold" }, part) : part
+      );
+      elements.push(
+        React.createElement('p', {
+          key: index,
+          className: "mb-2"
+        }, formattedParts)
+      );
+    }
+    // Regular paragraphs
+    else if (trimmed.length > 0) {
+      elements.push(
+        React.createElement('p', {
+          key: index,
+          className: "mb-2"
+        }, trimmed)
+      );
+    }
+  });
+  
+  return elements;
+};

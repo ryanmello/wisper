@@ -12,12 +12,14 @@ import { GitHubRepository } from "@/lib/interface/github-interface";
 import { GitHubAPI } from "@/lib/api/github-api";
 import { Dialog } from "../ui/dialog";
 import PlaybookDialog from "../playbook/PlaybookDialog";
+import type { Playbook } from "@/lib/interface/playbook-interface";
 
 interface ChatProps {
   isAuthenticated: boolean;
+  prefillPlaybook?: Playbook | null;
 }
 
-export function Chat({ isAuthenticated }: ChatProps) {
+export function Chat({ isAuthenticated, prefillPlaybook }: ChatProps) {
   const {
     createTask,
     isLoading: isTaskLoading,
@@ -120,6 +122,27 @@ export function Chat({ isAuthenticated }: ChatProps) {
       clearError();
     }
   }, [message, taskError, clearError]);
+
+  // Set prefill data from playbook when component mounts or repositories are loaded
+  useEffect(() => {
+    if (prefillPlaybook?.cipher_config?.prompt && !message) {
+      setMessage(prefillPlaybook.cipher_config.prompt);
+    }
+  }, [prefillPlaybook, message]);
+
+  useEffect(() => {
+    if (prefillPlaybook?.cipher_config?.repository && repositories.length > 0 && !selectedRepo) {
+      const prefillRepository = prefillPlaybook.cipher_config.repository;
+      const matchingRepo = repositories.find(repo => 
+        repo.url === prefillRepository || 
+        repo.full_name === prefillRepository.replace('https://github.com/', '') ||
+        `https://github.com/${repo.full_name}` === prefillRepository
+      );
+      if (matchingRepo) {
+        setSelectedRepo(matchingRepo);
+      }
+    }
+  }, [prefillPlaybook, repositories, selectedRepo]);
 
   const handleSend = async () => {
     if (

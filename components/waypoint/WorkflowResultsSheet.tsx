@@ -22,7 +22,7 @@ import {
   Copy,
   RotateCcw,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatSummaryText } from "@/lib/utils";
 import {
   WorkflowExecutionState,
   NodeExecutionState,
@@ -162,10 +162,10 @@ const WorkflowResultsSheet: React.FC<WorkflowResultsSheetProps> = ({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6 py-6 px-1">
+        <div className="flex-1 overflow-y-auto space-y-6 px-1">
           {/* Execution Summary */}
           <Card className="shadow-lg border-0 bg-gradient-to-br from-white via-slate-50/50 to-white backdrop-blur-sm">
-            <CardHeader className="pb-4 bg-gradient-to-r from-slate-50 to-slate-100/50 rounded-t-lg border-b border-slate-200/50">
+            <CardHeader className="pb-4 border-b border-slate-200/50">
               <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"></div>
                 Execution Summary
@@ -228,7 +228,7 @@ const WorkflowResultsSheet: React.FC<WorkflowResultsSheetProps> = ({
 
           {/* Tool Results */}
           <Card className="shadow-lg border-0 bg-gradient-to-br from-white via-slate-50/30 to-white">
-            <CardHeader className="pb-4 bg-gradient-to-r from-indigo-50 to-purple-50/50 rounded-t-lg border-b border-slate-200/50">
+            <CardHeader className="pb-4 border-b border-slate-200/50">
               <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"></div>
                 Tool Execution Timeline
@@ -310,7 +310,7 @@ const WorkflowResultsSheet: React.FC<WorkflowResultsSheetProps> = ({
           {/* Analysis Results */}
           {executionState.results && (
             <Card className="shadow-lg border-0 bg-gradient-to-br from-white via-blue-50/20 to-white">
-              <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-cyan-50/50 rounded-t-lg border-b border-slate-200/50">
+              <CardHeader className="pb-4 border-b border-slate-200/50">
                 <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
                   <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-full"></div>
                   AI Analysis Results
@@ -323,8 +323,8 @@ const WorkflowResultsSheet: React.FC<WorkflowResultsSheetProps> = ({
                       <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full"></div>
                       <div className="font-semibold text-blue-900 text-sm uppercase tracking-wide">Executive Summary</div>
                     </div>
-                    <div className="text-sm text-blue-800 leading-relaxed">
-                      {executionState.results.summary}
+                    <div className="text-sm text-blue-800 leading-relaxed space-y-3">
+                      {formatSummaryText(executionState.results.summary)}
                     </div>
                   </div>
 

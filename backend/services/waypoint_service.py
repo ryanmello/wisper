@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 class WaypointService():
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-4", 
+            model=settings.OPENAI_MODEL,
             temperature=0.1, 
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_BASE_URL
@@ -84,20 +84,21 @@ class WaypointService():
 
         Analyze this software analysis workflow configuration and determine if it makes logical sense based on your knowledge of the bound tools.
 
-        USER'S WORKFLOW:
-        Tools in workflow:
-        {chr(10).join(workflow_nodes)}
+        IMPORTANT: This workflow represents an EXECUTION SEQUENCE, not a strict data pipeline. Each tool has access to the full execution context from ALL previous tools. The LLM orchestrator can intelligently route data from any previous tool to subsequent tools based on their requirements - tools do not need direct connections to share data.
 
-        Connections (data flow):
-        {chr(10).join(workflow_connections) if workflow_connections else "- No connections (isolated tools)"}
+        EXECUTION ORDER:
+        {chr(10).join(workflow_connections) if workflow_connections else "- No explicit connections (tools execute in sequence with shared context)"}
+
+        Each connection shows: source_tool → target_tool (source executes BEFORE target).
 
         Please evaluate based on the tool schemas you have access to:
-        1. Do the tools flow in a logical order considering their inputs/outputs?
+        1. Following ONLY the connections above, do the tools execute in a logical order?
         2. Are there missing prerequisites (e.g., trying to create a pull request before performing analysis or applying fixes)?
         3. Does the workflow accomplish a coherent goal?
         4. Are there any incompatible tool sequences?
         5. Are tools being used appropriately for their intended purpose?
-
+        6. Remember: Any tool can access outputs from ANY previous tool in the sequence - data doesn't need to flow through direct connections.
+        
         DO NOT execute any tools - only analyze the workflow configuration.
 
         Respond with ONLY a JSON object in this format:

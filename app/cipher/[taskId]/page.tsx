@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { cn, formatTimeAgo, getStatusColor } from "@/lib/utils";
+import { cn, formatTimeAgo, getStatusColor, formatSummaryText } from "@/lib/utils";
 import { useAuth } from "@/context/auth-context";
 import { Task, ToolResult } from "@/lib/interface/cipher-interface";
 
@@ -210,9 +210,11 @@ const TaskDetailPage = ({ params }: TaskPageProps) => {
                   <div className="mt-3 p-3 bg-muted/50 rounded text-sm">
                     <div className="font-medium mb-1">Result:</div>
                     {tool.result.summary && (
-                      <p className="text-muted-foreground">
-                        {tool.result.summary}
-                      </p>
+                      <div className="text-muted-foreground space-y-2">
+                        {formatSummaryText(tool.result.summary) || (
+                          <p>{tool.result.summary}</p>
+                        )}
+                      </div>
                     )}
                     {tool.result.metrics && (
                       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -283,7 +285,11 @@ const TaskDetailPage = ({ params }: TaskPageProps) => {
             {/* Summary */}
             <div>
               <h4 className="font-medium mb-2">Summary</h4>
-              <p className="text-muted-foreground">{results.summary}</p>
+              <div className="text-muted-foreground space-y-3">
+                {formatSummaryText(results.summary) || (
+                  <p>{results.summary}</p>
+                )}
+              </div>
             </div>
 
             {/* Recommendations */}
@@ -357,8 +363,10 @@ const TaskDetailPage = ({ params }: TaskPageProps) => {
         <CardContent>
           <div className="space-y-3">
             {task.ai_messages.map((message, index) => (
-              <div key={index} className="p-3 bg-muted/50 rounded-lg text-sm">
-                {message}
+              <div key={index} className="p-3 bg-muted/50 rounded-lg text-sm space-y-2">
+                {formatSummaryText(message) || (
+                  <div>{message}</div>
+                )}
               </div>
             ))}
           </div>

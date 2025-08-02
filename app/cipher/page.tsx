@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
@@ -11,20 +11,37 @@ import { Button } from "@/components/ui/button";
 import { Fingerprint } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { Task } from "@/lib/interface/cipher-interface";
+import { PlaybookAPI } from "@/lib/api/playbook-api";
+import type { Playbook } from "@/lib/interface/playbook-interface";
 
 const CipherPage = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
   const { tasks, archivedTasks, isLoading: isTaskLoading } = useTask();
 
   const [activeTab, setActiveTab] = useState<"tasks" | "archived">("tasks");
+  const [prefillPlaybook, setPrefillPlaybook] = useState<Playbook | null>(null);
+  
+  // Extract playbook ID from URL parameters and fetch playbook data
+  const playbookId = searchParams.get('playbook');
 
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated) {
       router.push('/sign-in');
     }
   }, [isAuthLoading, isAuthenticated, router]);
+
+  // Fetch playbook data when playbook ID is provided
+  useEffect(() => {
+    if (playbookId && isAuthenticated) {
+      const playbook = PlaybookAPI.getPlaybookById(playbookId);
+      if (playbook && playbook.type === 'cipher') {
+        setPrefillPlaybook(playbook);
+      }
+    }
+  }, [playbookId, isAuthenticated]);
 
   const handleTaskClick = (taskId: string) => {
     router.push(`/cipher/${taskId}`);
@@ -50,7 +67,10 @@ const CipherPage = () => {
         </div>
 
         {/* Chat Component */}
-        <Chat isAuthenticated={isAuthenticated} />
+        <Chat 
+          isAuthenticated={isAuthenticated} 
+          prefillPlaybook={prefillPlaybook}
+        />
 
         {/* Tasks Section */}
         <div className="mt-8">

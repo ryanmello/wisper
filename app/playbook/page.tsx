@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import { useAuth } from "@/context/auth-context";
-import { useTask } from "@/context/task-context";
 import { PlaybookCard } from "@/components/playbook/PlaybookCard";
 import { Button } from "@/components/ui/button";
 import type { Playbook } from "@/lib/interface/playbook-interface";
@@ -24,7 +23,6 @@ import { toast } from "sonner";
 
 export default function Playbook() {
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
-  const { createTask } = useTask();
   const router = useRouter();
   const cipherScrollRef = useRef<HTMLDivElement>(null);
   const waypointScrollRef = useRef<HTMLDivElement>(null);
@@ -76,27 +74,17 @@ export default function Playbook() {
         // Set loading state for this specific playbook
         setLoadingStates(prev => ({ ...prev, [playbook.id]: true }));
 
-        // Create task using task context (this adds it to the context automatically)
-        const task = await createTask({
-          repository_url: playbook.cipher_config.repository,
-          prompt: playbook.cipher_config.prompt
-        });
-
-        if (!task) {
-          throw new Error("Failed to create task");
-        }
-
-        // Store the started task
-        setStartedTasks(prev => ({ ...prev, [playbook.id]: task.id }));
+        // Navigate to cipher page with playbook ID
+        router.push(`/cipher?playbook=${playbook.id}`);
 
         // Show success feedback
-        toast.success("Analysis Started!", {
-          description: `"${playbook.name}" playbook is now running. Click "View Task" to monitor progress.`
+        toast.success("Playbook Loaded!", {
+          description: `"${playbook.name}" has been loaded in Cipher. Review and click send to start the analysis.`
         });
 
       } catch (error) {
-        console.error("Error starting cipher analysis:", error);
-        toast.error("Failed to start analysis", {
+        console.error("Error loading cipher playbook:", error);
+        toast.error("Failed to load playbook", {
           description: error instanceof Error ? error.message : "An unexpected error occurred."
         });
       } finally {

@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 class Orchestrator:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="gpt-4", 
+            model=settings.OPENAI_MODEL, 
             temperature=0, 
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_BASE_URL

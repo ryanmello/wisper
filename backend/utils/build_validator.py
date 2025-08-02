@@ -48,13 +48,17 @@ class BuildValidator:
                     except Exception as e:
                         logger.warning(f"Could not backup {file_path}: {e}")
             
-            # Remember original go.sum for comparison
+            # Always backup go.sum if it exists (go mod tidy may modify it)
             original_go_sum = None
             go_sum_path = os.path.join(repo_path, "go.sum")
             if os.path.exists(go_sum_path):
                 try:
                     with open(go_sum_path, 'r', encoding='utf-8') as f:
                         original_go_sum = f.read()
+                        # Add to backup_files so it gets restored on failure
+                        if "go.sum" not in backup_files:
+                            backup_files["go.sum"] = original_go_sum
+                            logger.debug("Backed up original go.sum for restoration")
                 except Exception as e:
                     logger.warning(f"Could not read original go.sum: {e}")
             

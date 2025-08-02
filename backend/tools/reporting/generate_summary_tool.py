@@ -41,7 +41,7 @@ def generate_summary(tool_results: Any) -> StandardToolResponse:
             )
         
         llm = ChatOpenAI(
-            model="gpt-4",
+            model=settings.OPENAI_MODEL,
             temperature=0.2,
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_BASE_URL

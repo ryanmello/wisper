@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { AuthProvider } from "@/context/auth-context";
 import { TaskProvider } from "@/context/task-context";
 import Sidebar from "@/components/Sidebar";
-import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Conscience",

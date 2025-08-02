@@ -20,6 +20,7 @@ class Settings:
     
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-4.1"
     
     TEMP_DIR_PREFIX: str = f"{PROJECT_NAME}_"
     
