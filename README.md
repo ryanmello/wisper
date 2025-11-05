@@ -2,7 +2,7 @@
 
 > **Transform repository analysis, security scanning, and code review with AI-driven workflows**
 
-Wisper is an intelligent development automation platform that combines natural language AI with visual workflow orchestration to streamline complex development tasks. Built with enterprise-grade architecture, it features four specialized modules that work together to automate code analysis, vulnerability detection, pull request management, and workflow execution.
+Wisper is an intelligent development automation platform that combines natural language AI with visual workflow orchestration to streamline complex development tasks. Wisper features four specialized modules that work together to automate code analysis, vulnerability detection, pull request management, and workflow execution.
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.3-black?logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.0-blue?logo=react)](https://react.dev/)
