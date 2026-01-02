@@ -2,7 +2,7 @@ import os
 import time
 import re
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional
 from langchain_core.tools import tool
 from git import Repo
 from utils.logging_config import get_logger
@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 @tool_category("git_operations")
 @tool
-def create_pull_request(repository_path: str, branch_name: str, title: str, description: str, commit_message: str, vulnerability_scan_output: Optional[Union[str, StandardToolResponse]] = None) -> StandardToolResponse:
+def create_pull_request(repository_path: str, branch_name: str, title: str, description: str, commit_message: str, vulnerability_scan_output: Optional[str] = None) -> StandardToolResponse:
     """Create a GitHub pull request.
     
     This tool creates a new branch, commits existing changes, and opens a pull request on the original repository. 
@@ -34,7 +34,7 @@ def create_pull_request(repository_path: str, branch_name: str, title: str, desc
         title: Detailed title for the pull request that include all major changes
         description: Detailed description of the changes and their purpose (used as fallback if no scan output)
         commit_message: Descriptive commit message for the changes
-        vulnerability_scan_output: Optional output from vulnerability scanning tools (e.g., govulncheck) to generate detailed security descriptions. Can be either raw string output or StandardToolResponse object
+        vulnerability_scan_output: Optional output from vulnerability scanning tools (e.g., govulncheck) to generate detailed security descriptions
         
     Returns:
         StandardToolResponse with pull request URL, status, and details of the created PR
