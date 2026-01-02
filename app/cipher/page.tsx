@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useTask } from "@/context/task-context";
@@ -14,7 +14,7 @@ import { Task } from "@/lib/interface/cipher-interface";
 import { PlaybookAPI } from "@/lib/api/playbook-api";
 import type { Playbook } from "@/lib/interface/playbook-interface";
 
-const CipherPage = () => {
+function CipherPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -130,6 +130,12 @@ const CipherPage = () => {
       </div>
     </div>
   );
-};
+}
 
-export default CipherPage;
+export default function CipherPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>}>
+      <CipherPageContent />
+    </Suspense>
+  );
+}

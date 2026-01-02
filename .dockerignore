@@ -1,0 +1,40 @@
+# Dependencies
+node_modules
+backend/venv
+__pycache__
+*.pyc
+
+# Build outputs
+.next
+.turbo
+dist
+
+# Development files
+.git
+.gitignore
+*.md
+!README.md
+
+# IDE and OS files
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Environment files (use docker-compose env instead)
+.env
+.env.local
+.env*.local
+
+# Testing
+coverage
+.pytest_cache
+htmlcov
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker files (prevent recursive copy)
+Dockerfile*
+docker-compose*.yml

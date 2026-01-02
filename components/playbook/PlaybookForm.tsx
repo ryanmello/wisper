@@ -248,7 +248,7 @@ export default function PlaybookForm({
           description: result?.message,
         });
       }
-    } catch (err) {
+    } catch {
       toast.error(`Failed to ${isSaveMode ? "save" : "update"} playbook`, {
         description: "An unexpected error occurred.",
       });

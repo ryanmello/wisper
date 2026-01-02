@@ -1,0 +1,26 @@
+FROM python:3.12-slim AS backend
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /bin/bash appuser
+
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY backend/ ./
+
+RUN mkdir -p /tmp/wisper && chown appuser:appuser /tmp/wisper
+
+USER appuser
+
+EXPOSE 8000
+
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV RELOAD=false
+ENV LOG_LEVEL=info
+
+CMD ["python", "main.py"]

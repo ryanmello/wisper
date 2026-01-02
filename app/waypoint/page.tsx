@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AuthLoadingScreen } from "@/components/AuthLoadingScreen";
 import Canvas from "@/components/waypoint/Canvas";
@@ -27,8 +27,7 @@ import { Dialog } from "@/components/ui/dialog";
 import PlaybookDialog from "@/components/playbook/PlaybookDialog";
 import WorkflowResultsSheet from "@/components/waypoint/WorkflowResultsSheet";
 import { PlaybookAPI } from "@/lib/api/playbook-api";
-import { Button } from "@/components/ui/button";
-import { Layers, X, type LucideIcon } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getToolIconByName, formatToolLabel, formatCategory } from "@/components/waypoint/ToolSidebar";
 
@@ -42,7 +41,7 @@ interface DraggedToolType {
   description: string;
 }
 
-export default function Waypoint() {
+function WaypointContent() {
   const { isLoading: isAuthLoading, isAuthenticated, getToken } = useAuth();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -68,15 +67,15 @@ export default function Waypoint() {
   const [nodeActionsVisible, setNodeActionsVisible] = useState<string | null>(
     null
   );
-  const [loading, setIsLoading] = useState<boolean>(false);
+  const [, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [repositories, setRepositories] = useState<GitHubRepository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepository | null>(null);
 
   // Playbook loading state
-  const [isPlaybookLoaded, setIsPlaybookLoaded] = useState(false);
+  const [, setIsPlaybookLoaded] = useState(false);
   const [loadedPlaybookId, setLoadedPlaybookId] = useState<string | null>(null);
-  const [loadedPlaybookName, setLoadedPlaybookName] = useState<string>('');
+  const [, setLoadedPlaybookName] = useState<string>('');
 
   const [executionState, setExecutionState] = useState<WorkflowExecutionState>({
     isRunning: false,
@@ -85,7 +84,7 @@ export default function Waypoint() {
     overallProgress: 0,
     executionOrder: [],
   });
-  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [, setCurrentTaskId] = useState<string | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   
   // Force connection position updates after execution state changes
@@ -190,26 +189,6 @@ export default function Waypoint() {
         description: "An error occurred while loading the playbook workflow."
       });
     }
-  };
-
-  const clearLoadedPlaybook = () => {
-    setNodes([]);
-    setConnections([]);
-    setSelectedRepo(null);
-    setIsPlaybookLoaded(false);
-    setLoadedPlaybookId(null);
-    setLoadedPlaybookName('');
-    resetVerificationStatus();
-    resetExecutionState();
-    
-    // Remove playbook parameter from URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('playbook');
-    window.history.replaceState({}, '', url.toString());
-
-    toast.success("Workflow cleared", {
-      description: "The loaded playbook workflow has been cleared."
-    });
   };
 
   // Force connection position recalculation when execution state changes
@@ -865,5 +844,13 @@ export default function Waypoint() {
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
+  );
+}
+
+export default function Waypoint() {
+  return (
+    <Suspense fallback={<div className="h-screen flex items-center justify-center bg-white">Loading...</div>}>
+      <WaypointContent />
+    </Suspense>
   );
 }

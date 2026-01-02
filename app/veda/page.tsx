@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -422,33 +421,6 @@ export default function Veda() {
         setShowPRDropdownContent(true);
       }, 150);
     }
-  };
-
-  // Get language color for repository
-  const getLanguageColor = (language: string | null) => {
-    if (!language) return "bg-gray-400";
-
-    const colors: Record<string, string> = {
-      JavaScript: "bg-yellow-400",
-      TypeScript: "bg-blue-400",
-      Python: "bg-green-400",
-      Java: "bg-orange-400",
-      "C++": "bg-blue-600",
-      C: "bg-gray-600",
-      "C#": "bg-purple-400",
-      Go: "bg-cyan-400",
-      Rust: "bg-orange-600",
-      PHP: "bg-indigo-400",
-      Ruby: "bg-red-400",
-      Swift: "bg-orange-500",
-      Kotlin: "bg-purple-600",
-      Dart: "bg-blue-500",
-      HTML: "bg-orange-500",
-      CSS: "bg-blue-500",
-      Shell: "bg-gray-500",
-    };
-
-    return colors[language] || "bg-gray-400";
   };
 
   return (

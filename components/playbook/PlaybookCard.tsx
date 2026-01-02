@@ -9,10 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Playbook } from "@/lib/interface/playbook-interface";
@@ -22,10 +18,6 @@ import {
   Calendar,
   User,
   Play,
-  Copy,
-  Share,
-  MoreHorizontal,
-  AlertTriangle,
   Pencil,
   Trash,
   Loader2,
@@ -40,8 +32,6 @@ interface PlaybookCardProps {
   hasStartedTask?: boolean;
   onRun?: (playbook: Playbook) => void;
   onViewTask?: (playbook: Playbook) => void;
-  onCopy?: (playbook: Playbook) => void;
-  onShare?: (playbook: Playbook) => void;
   onEdit?: (playbook: Playbook) => void;
   onDelete?: (playbook: Playbook) => void;
 }
@@ -52,8 +42,6 @@ export function PlaybookCard({
   hasStartedTask = false,
   onRun,
   onViewTask,
-  onCopy,
-  onShare,
   onEdit,
   onDelete,
 }: PlaybookCardProps) {

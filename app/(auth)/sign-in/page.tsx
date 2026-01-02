@@ -17,7 +17,6 @@ import {
   AlertCircle,
   CheckCircle,
   Settings,
-  Fingerprint,
   ArrowRight,
   Sparkles,
 } from "lucide-react";

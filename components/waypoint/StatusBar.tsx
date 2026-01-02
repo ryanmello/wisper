@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Info,
   Square,
-  BookMarked,
   Layers,
   FileText,
 } from "lucide-react";

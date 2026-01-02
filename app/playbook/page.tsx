@@ -9,13 +9,11 @@ import { Button } from "@/components/ui/button";
 import type { Playbook } from "@/lib/interface/playbook-interface";
 import {
   Layers,
-  Plus,
   ChevronLeft,
   ChevronRight,
   Fingerprint,
   Waypoints,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useRef } from "react";
 import EmptyState from "@/components/EmptyState";
 import { PlaybookAPI } from "@/lib/api/playbook-api";
@@ -31,7 +29,7 @@ export default function Playbook() {
   const [waypointPlaybooks, setWaypointPlaybooks] = useState<Playbook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
-  const [startedTasks, setStartedTasks] = useState<Record<string, string>>({});
+  const [startedTasks] = useState<Record<string, string>>({});
 
   const loadPlaybooks = async () => {
     try {
@@ -131,23 +129,13 @@ export default function Playbook() {
     }
   };
 
-  const handleCopyPlaybook = (playbook: Playbook) => {
-    console.log("Copying playbook:", playbook.name);
-    // TODO: Implement copy logic
-  };
-
-  const handleSharePlaybook = (playbook: Playbook) => {
-    console.log("Sharing playbook:", playbook.name);
-    // TODO: Implement share logic
-  };
-
-  const handleDeletePlaybook = async (playbook: Playbook) => {
+  const handleDeletePlaybook = async () => {
     // This is called after successful deletion from the dialog
     // Just refresh the list, don't call the API again
     await loadPlaybooks();
   };
 
-  const handleEditPlaybook = async (playbook: Playbook) => {
+  const handleEditPlaybook = async () => {
     // Refresh the playbooks list after editing
     await loadPlaybooks();
   };
@@ -242,8 +230,6 @@ export default function Playbook() {
                       hasStartedTask={!!startedTasks[playbook.id]}
                       onRun={handleRunPlaybook}
                       onViewTask={handleViewTask}
-                      onCopy={handleCopyPlaybook}
-                      onShare={handleSharePlaybook}
                       onEdit={handleEditPlaybook}
                       onDelete={handleDeletePlaybook}
                     />
@@ -308,8 +294,6 @@ export default function Playbook() {
                       hasStartedTask={!!startedTasks[playbook.id]}
                       onRun={handleRunPlaybook}
                       onViewTask={handleViewTask}
-                      onCopy={handleCopyPlaybook}
-                      onShare={handleSharePlaybook}
                       onEdit={handleEditPlaybook}
                       onDelete={handleDeletePlaybook}
                     />
