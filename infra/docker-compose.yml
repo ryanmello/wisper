@@ -1,8 +1,8 @@
 services:
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      context: ..
+      dockerfile: infra/Dockerfile.frontend
       args:
         NEXT_PUBLIC_BACKEND_URL: http://backend:8000
     container_name: wisper-frontend
@@ -19,8 +19,8 @@ services:
     
   backend:
     build:
-      context: .
-      dockerfile: Dockerfile.backend
+      context: ..
+      dockerfile: infra/Dockerfile.backend
     container_name: wisper-backend
     ports:
       - "8000:8000"

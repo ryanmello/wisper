@@ -36,5 +36,6 @@ htmlcov
 npm-debug.log*
 
 # Docker files (prevent recursive copy)
-Dockerfile*
-docker-compose*.yml
+infra/Dockerfile*
+infra/docker-compose*.yml
+
